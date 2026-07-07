@@ -14,6 +14,27 @@ After the first successful workflow run, the site will be available at:
 https://fefedu973.github.io/responsive-breadcrumb/
 ```
 
+## Install With shadcn
+
+Install directly from the GitHub registry:
+
+```bash
+bunx shadcn@latest add Fefedu973/responsive-breadcrumb/responsive-breadcrumb
+```
+
+Or register the GitHub Pages namespace:
+
+```bash
+bunx shadcn@latest registry add @responsive-breadcrumb=https://fefedu973.github.io/responsive-breadcrumb/r/{name}.json
+bunx shadcn@latest add @responsive-breadcrumb/responsive-breadcrumb
+```
+
+Use it from your configured shadcn `ui` alias:
+
+```tsx
+import { ResponsiveBreadcrumb } from "@/components/ui/responsive-breadcrumb";
+```
+
 ## Features
 
 - Real DOM measurement for items, separators, ellipsis, next controls, and title-only fallback.
@@ -34,11 +55,14 @@ https://fefedu973.github.io/responsive-breadcrumb/
 
 ```txt
 apps/web/src/components/responsive/
+  index.ts
   ResponsiveBreadcrumb.tsx
   BreadcrumbRenderer.tsx
   solveBreadcrumbLayout.ts
   useBreadcrumbMeasurements.ts
   types.ts
+
+registry.json
 
 apps/web/tests/
   solveBreadcrumbLayout.test.ts
@@ -71,6 +95,8 @@ Run checks:
 ```bash
 bun run --cwd apps/web test:solver
 bunx tsc --noEmit -p apps/web/tsconfig.json
+bun run registry:validate
+bun run registry:build
 bun run --cwd apps/web build
 ```
 
@@ -83,5 +109,6 @@ It:
 1. Installs dependencies with Bun.
 2. Runs solver tests.
 3. Runs TypeScript.
-4. Builds the Next.js demo as a static export.
-5. Uploads `apps/web/out` to GitHub Pages.
+4. Builds the shadcn registry JSON into `apps/web/public/r`.
+5. Builds the Next.js demo as a static export.
+6. Uploads `apps/web/out` to GitHub Pages.

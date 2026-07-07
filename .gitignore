@@ -6,3 +6,4 @@ node_modules
 docs/
 specifications.md
 apps/web/src/components/responsive/TODO_BREADCRUMB.md
+apps/web/public/r/

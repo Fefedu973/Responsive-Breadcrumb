@@ -12,7 +12,9 @@
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
-    "dev:server": "turbo -F server dev"
+    "dev:server": "turbo -F server dev",
+    "registry:build": "bunx shadcn@latest build registry.json --output apps/web/public/r",
+    "registry:validate": "bunx shadcn@latest registry validate registry.json"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15"

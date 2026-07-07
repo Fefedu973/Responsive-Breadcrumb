@@ -39,6 +39,9 @@ jobs:
       - name: Check TypeScript
         run: bunx tsc --noEmit -p apps/web/tsconfig.json
 
+      - name: Build shadcn registry
+        run: bun run registry:build
+
       - name: Build static demo
         run: bun run --cwd apps/web build
         env:

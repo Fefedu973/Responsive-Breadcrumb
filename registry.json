@@ -1,0 +1,72 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "responsive-breadcrumb",
+  "homepage": "https://github.com/Fefedu973/responsive-breadcrumb",
+  "items": [
+    {
+      "name": "responsive-breadcrumb",
+      "type": "registry:ui",
+      "title": "Responsive Breadcrumb",
+      "description": "A measured shadcn/ui breadcrumb that collapses responsive ranges into accessible popovers or mobile drawers.",
+      "author": "Fefedu973",
+      "registryDependencies": [
+        "badge",
+        "breadcrumb",
+        "button",
+        "drawer",
+        "popover",
+        "tooltip"
+      ],
+      "dependencies": [
+        "lucide-react"
+      ],
+      "files": [
+        {
+          "path": "apps/web/src/components/responsive/index.ts",
+          "type": "registry:ui",
+          "target": "@ui/responsive-breadcrumb/index.ts"
+        },
+        {
+          "path": "apps/web/src/components/responsive/ResponsiveBreadcrumb.tsx",
+          "type": "registry:ui",
+          "target": "@ui/responsive-breadcrumb/ResponsiveBreadcrumb.tsx"
+        },
+        {
+          "path": "apps/web/src/components/responsive/BreadcrumbRenderer.tsx",
+          "type": "registry:ui",
+          "target": "@ui/responsive-breadcrumb/BreadcrumbRenderer.tsx"
+        },
+        {
+          "path": "apps/web/src/components/responsive/solveBreadcrumbLayout.ts",
+          "type": "registry:ui",
+          "target": "@ui/responsive-breadcrumb/solveBreadcrumbLayout.ts"
+        },
+        {
+          "path": "apps/web/src/components/responsive/useBreadcrumbMeasurements.ts",
+          "type": "registry:ui",
+          "target": "@ui/responsive-breadcrumb/useBreadcrumbMeasurements.ts"
+        },
+        {
+          "path": "apps/web/src/components/responsive/types.ts",
+          "type": "registry:ui",
+          "target": "@ui/responsive-breadcrumb/types.ts"
+        },
+        {
+          "path": "apps/web/src/hooks/use-media-query.tsx",
+          "type": "registry:hook",
+          "target": "@hooks/use-media-query.tsx"
+        }
+      ],
+      "docs": "Import with `import { ResponsiveBreadcrumb } from \"@/components/ui/responsive-breadcrumb\"`. Install from GitHub with `shadcn add Fefedu973/responsive-breadcrumb/responsive-breadcrumb`, or register the Pages namespace with `shadcn registry add @responsive-breadcrumb=https://fefedu973.github.io/responsive-breadcrumb/r/{name}.json` then run `shadcn add @responsive-breadcrumb/responsive-breadcrumb`.",
+      "categories": [
+        "breadcrumb",
+        "navigation",
+        "responsive"
+      ],
+      "meta": {
+        "demo": "https://fefedu973.github.io/responsive-breadcrumb/",
+        "source": "https://github.com/Fefedu973/responsive-breadcrumb"
+      }
+    }
+  ]
+}

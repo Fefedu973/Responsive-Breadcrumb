@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { ChevronRight, Home, MoreHorizontal } from "lucide-react";
 import {
   Breadcrumb,
@@ -41,7 +40,6 @@ import type {
 } from "./types";
 
 type OverlayId = string | null;
-type NextLinkHref = React.ComponentProps<typeof Link>["href"];
 
 export interface BreadcrumbRendererProps {
   items: BreadcrumbData[];
@@ -322,14 +320,14 @@ function RenderedItem({
     "inline-flex min-w-0 max-w-full shrink-0 items-center gap-1.5 truncate";
   const itemElement = interactive && item.href ? (
     <BreadcrumbLink asChild className={itemClassName} style={itemStyle}>
-      <Link
-        href={item.href as NextLinkHref}
+      <a
+        href={item.href}
         onClick={() => onItemClick?.(item)}
         aria-disabled={item.disabled || undefined}
         itemProp={schema === "microdata" ? "item" : undefined}
       >
         {contentWithSchema}
-      </Link>
+      </a>
     </BreadcrumbLink>
   ) : interactive ? (
     <button
@@ -758,8 +756,8 @@ function MenuItems({
                 compact ? "h-7 px-2 text-sm" : "h-auto px-2 py-2",
               )}
             >
-              <Link
-                href={item.href as NextLinkHref}
+              <a
+                href={item.href}
                 aria-label={itemAriaLabel}
                 onClick={() => {
                   onItemClick?.(item);
@@ -767,7 +765,7 @@ function MenuItems({
                 }}
               >
                 {content}
-              </Link>
+              </a>
             </Button>
           );
         }
