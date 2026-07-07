@@ -10,7 +10,6 @@ const EMPTY_MEASUREMENTS: BreadcrumbMeasurements = {
   ellipsisWidth: 0,
   nextArrowWidth: 0,
   titleOnlyWidth: 0,
-  compactTokenWidths: [],
   gap: 0,
   ready: false,
   signature: "empty",
@@ -47,10 +46,6 @@ export function useBreadcrumbMeasurements({
     const ellipsisWidth = readSingleWidth(measureRoot, "measureEllipsis");
     const nextArrowWidth = readSingleWidth(measureRoot, "measureNext");
     const titleOnlyWidth = readSingleWidth(measureRoot, "measureTitleOnly");
-    const compactTokenWidths = readIndexedWidths(
-      measureRoot,
-      "measureCompactToken",
-    );
     const containerWidth = container.getBoundingClientRect().width;
     const gapSource =
       measureRoot.querySelector<HTMLElement>('[data-measure-list="full"]') ??
@@ -63,7 +58,6 @@ export function useBreadcrumbMeasurements({
       round(ellipsisWidth),
       round(nextArrowWidth),
       round(titleOnlyWidth),
-      compactTokenWidths.map(round).join(","),
       round(gap),
     ].join("|");
 
@@ -79,7 +73,6 @@ export function useBreadcrumbMeasurements({
       ellipsisWidth,
       nextArrowWidth,
       titleOnlyWidth,
-      compactTokenWidths,
       gap,
       ready: itemWidths.length > 0,
       signature,

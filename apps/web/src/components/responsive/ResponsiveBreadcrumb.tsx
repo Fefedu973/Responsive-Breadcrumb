@@ -11,14 +11,9 @@ import {
   solveBreadcrumbLayout,
 } from "./solveBreadcrumbLayout";
 import type {
-  BreadcrumbAnimation,
   BreadcrumbData,
   BreadcrumbDebugState,
   BreadcrumbFocusRing,
-  BreadcrumbItemDisplay,
-  BreadcrumbPathTruncationOptions,
-  BreadcrumbSelectedRing,
-  BreadcrumbTruncationMode,
   LayoutNode,
   ResponsiveBreadcrumbProps,
   ResponsiveBreadcrumbStrings,
@@ -40,13 +35,6 @@ const DEFAULT_STRINGS: ResponsiveBreadcrumbStrings = {
   truncatedItemTooltip: (label) => label,
   measureEllipsis: "Measure ellipsis",
   measureNextItems: "Measure next items",
-};
-
-type SelectedRingRect = {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
 };
 
 export function ResponsiveBreadcrumb({
@@ -76,9 +64,6 @@ export function ResponsiveBreadcrumb({
   truncateMaxWidth = 200,
   truncateThreshold = 100,
   truncateOrder = "biggest-first",
-  truncationMode = "width",
-  pathTruncation,
-  compactReveal,
   showTooltipOnTruncate = true,
   allowMultipleEllipses = false,
   grouping = "contiguous",
@@ -90,11 +75,6 @@ export function ResponsiveBreadcrumb({
   lockOnOverlayOpen = true,
   overflowBehavior = "collapse",
   focusRing,
-  selectedRing = "none",
-  selectedKey,
-  selectedIndex,
-  selectedRingClassName,
-  animateLayout = false,
   fallbackAtWidth,
   lastItemClickable = false,
   schema = "json-ld",
@@ -111,10 +91,6 @@ export function ResponsiveBreadcrumb({
   const measureRef = React.useRef<HTMLDivElement | null>(null);
   const isMobile = useMediaQuery("(max-width: 768px)");
   const [openOverlay, setOpenOverlay] = React.useState<string | null>(null);
-  const [internalCompactRevealIndex, setInternalCompactRevealIndex] =
-    React.useState<number | null>(null);
-  const [selectedRingRect, setSelectedRingRect] =
-    React.useState<SelectedRingRect | null>(null);
   const [detectedDirection, setDetectedDirection] = React.useState<"ltr" | "rtl">(
     "ltr",
   );
@@ -127,18 +103,6 @@ export function ResponsiveBreadcrumb({
   const includeNextArrow = showNextArrow && nextItems.length > 0;
   const resolvedFocusRing =
     focusRing ?? (overflowBehavior === "collapse" ? "inset" : "outer");
-  const compactRevealIndex =
-    compactReveal?.controlledIndex ?? internalCompactRevealIndex;
-  const setCompactRevealIndex = React.useCallback(
-    (index: number | null) => {
-      if (compactReveal?.controlledIndex === undefined) {
-        setInternalCompactRevealIndex(index);
-      }
-
-      compactReveal?.onControlledIndexChange?.(index);
-    },
-    [compactReveal],
-  );
   const resolvedStrings = React.useMemo(
     () => ({ ...DEFAULT_STRINGS, ...strings }),
     [strings],
@@ -168,10 +132,6 @@ export function ResponsiveBreadcrumb({
   const itemWidths = React.useMemo(
     () => normalizeMeasuredWidths(measurements.itemWidths, items.length),
     [items.length, measurements.itemWidths],
-  );
-  const compactTokenWidths = React.useMemo(
-    () => normalizeMeasuredWidths(measurements.compactTokenWidths, items.length),
-    [items.length, measurements.compactTokenWidths],
   );
   const separatorWidths = React.useMemo(
     () =>
@@ -216,9 +176,6 @@ export function ResponsiveBreadcrumb({
 
   const buildLayoutForWidths = React.useCallback(
     (itemWidths: number[], fullLayoutForWidths: LayoutNode[]) => {
-      const protectedRevealIndex =
-        truncationMode === "compact-reveal" ? compactRevealIndex : null;
-
       if (items.length === 0) {
         return [];
       }
@@ -258,20 +215,12 @@ export function ResponsiveBreadcrumb({
         options: {
           strategy,
           preference,
-          canCollapse: items.map((item, index) => {
-            if (index === protectedRevealIndex) {
-              return false;
-            }
-
-            return getCanCollapse(item, index, items.length);
-          }),
-          forcedCollapsed: items.map((item, index) => {
-            if (index === protectedRevealIndex) {
-              return false;
-            }
-
-            return forceCollapse?.(item, index) ?? false;
-          }),
+          canCollapse: items.map((item, index) =>
+            getCanCollapse(item, index, items.length),
+          ),
+          forcedCollapsed: items.map((item, index) =>
+            forceCollapse?.(item, index) ?? false,
+          ),
           itemPriority: itemPriority
             ? items.map((item, index) => itemPriority(item, index))
             : undefined,
@@ -285,7 +234,6 @@ export function ResponsiveBreadcrumb({
     },
     [
       allowMultipleEllipses,
-      compactRevealIndex,
       customLoadingFallback,
       fallbackAtWidth,
       forceCollapse,
@@ -307,7 +255,6 @@ export function ResponsiveBreadcrumb({
       separatorWidths,
       strategy,
       tailCount,
-      truncationMode,
     ],
   );
 
@@ -332,7 +279,6 @@ export function ResponsiveBreadcrumb({
       computeTruncation({
         items,
         itemWidths,
-        compactTokenWidths,
         separatorWidths,
         availableWidth: measurements.containerWidth,
         gapWidth: measurements.gap,
@@ -343,17 +289,8 @@ export function ResponsiveBreadcrumb({
         truncateMaxWidth,
         truncateThreshold,
         truncateOrder,
-        truncationMode,
-        compactRevealIndex,
-        compactReveal,
-        alwaysShowHead: headCount,
-        alwaysShowTail: tailCount,
       }),
     [
-      compactReveal,
-      compactRevealIndex,
-      compactTokenWidths,
-      headCount,
       includeNextArrow,
       items,
       itemWidths,
@@ -366,8 +303,6 @@ export function ResponsiveBreadcrumb({
       truncateMinWidth,
       truncateOrder,
       truncateThreshold,
-      truncationMode,
-      tailCount,
     ],
   );
 
@@ -393,84 +328,6 @@ export function ResponsiveBreadcrumb({
     () => buildLayoutForWidths(truncation.itemWidths, fullLayout),
     [buildLayoutForWidths, fullLayout, truncation.itemWidths],
   );
-  const selectedRingTargetIndex = React.useMemo(() => {
-    if (selectedRing !== "overlay") {
-      return null;
-    }
-
-    if (typeof selectedIndex === "number") {
-      return selectedIndex >= 0 && selectedIndex < items.length
-        ? selectedIndex
-        : null;
-    }
-
-    if (selectedKey) {
-      const index = items.findIndex((item) => item.key === selectedKey);
-      return index >= 0 ? index : null;
-    }
-
-    return items.length > 0 ? items.length - 1 : null;
-  }, [items, selectedIndex, selectedKey, selectedRing]);
-
-  const updateSelectedRingRect = React.useCallback(() => {
-    const container = containerRef.current;
-
-    if (selectedRingTargetIndex === null || !container) {
-      setSelectedRingRect(null);
-      return;
-    }
-
-    const target = container.querySelector<HTMLElement>(
-      `[data-breadcrumb-renderer="visible"] [data-breadcrumb-item-index="${selectedRingTargetIndex}"]`,
-    );
-
-    if (!target) {
-      setSelectedRingRect(null);
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    setSelectedRingRect({
-      left: targetRect.left - containerRect.left,
-      top: targetRect.top - containerRect.top,
-      width: targetRect.width,
-      height: targetRect.height,
-    });
-  }, [selectedRingTargetIndex]);
-
-  React.useLayoutEffect(() => {
-    updateSelectedRingRect();
-  }, [
-    layout,
-    measurements.signature,
-    selectedRingTargetIndex,
-    updateSelectedRingRect,
-  ]);
-
-  React.useLayoutEffect(() => {
-    if (selectedRingTargetIndex === null) {
-      return;
-    }
-
-    const container = containerRef.current;
-    if (!container || typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const observer = new ResizeObserver(() => updateSelectedRingRect());
-    observer.observe(container);
-
-    const target = container.querySelector<HTMLElement>(
-      `[data-breadcrumb-renderer="visible"] [data-breadcrumb-item-index="${selectedRingTargetIndex}"]`,
-    );
-
-    if (target) {
-      observer.observe(target);
-    }
-
-    return () => observer.disconnect();
-  }, [selectedRingTargetIndex, updateSelectedRingRect]);
 
   const validOverlayIds = React.useMemo(() => {
     const ids = new Set<string>();
@@ -628,14 +485,7 @@ export function ResponsiveBreadcrumb({
       separatorNavSide={separatorNavSide}
       overflowBehavior={overflowBehavior}
       focusRing={resolvedFocusRing}
-      gapWidth={measurements.gap}
       truncatedWidths={truncation.truncatedWidths}
-      itemDisplays={truncation.displays}
-      pathTruncation={pathTruncation}
-      compactReveal={compactReveal}
-      compactRevealIndex={compactRevealIndex}
-      onCompactRevealIndexChange={setCompactRevealIndex}
-      animateLayout={animateLayout}
       showTooltipOnTruncate={showTooltipOnTruncate}
       schema={schema}
       showCurrentInNav={showCurrentInNav}
@@ -664,21 +514,6 @@ export function ResponsiveBreadcrumb({
       ) : (
         breadcrumb
       )}
-      {selectedRing === "overlay" && selectedRingRect ? (
-        <div
-          aria-hidden="true"
-          className={cn(
-            "pointer-events-none absolute rounded-md ring-2 ring-ring/50 transition-[left,top,width,height,opacity] duration-150 ease-out motion-reduce:transition-none",
-            selectedRingClassName,
-          )}
-          style={{
-            left: `${selectedRingRect.left}px`,
-            top: `${selectedRingRect.top}px`,
-            width: `${selectedRingRect.width}px`,
-            height: `${selectedRingRect.height}px`,
-          }}
-        />
-      ) : null}
       <MeasurementTree
         ref={measureRef}
         items={items}
@@ -705,8 +540,6 @@ export function ResponsiveBreadcrumb({
         clickableLeftOfEllipsis={clickableLeftOfEllipsis}
         strings={resolvedStrings}
         focusRing={resolvedFocusRing}
-        compactReveal={compactReveal}
-        animateLayout={animateLayout}
         isRtl={isRtl}
       />
     </div>
@@ -716,24 +549,17 @@ export function ResponsiveBreadcrumb({
 export const FinalResponsiveBreadcrumb = ResponsiveBreadcrumb;
 export default ResponsiveBreadcrumb;
 export type {
-  BreadcrumbAnimation,
   BreadcrumbData,
   BreadcrumbDebugState,
   CollapsePreference,
   CollapseStrategy,
-  BreadcrumbCompactRevealOptions,
   BreadcrumbFocusRing,
-  BreadcrumbItemDisplay,
-  BreadcrumbPathTruncationOptions,
-  BreadcrumbSelectedRing,
-  BreadcrumbTruncationMode,
   LayoutNode,
   ResponsiveBreadcrumbProps,
   SeparatorNavItem,
 } from "./types";
 
 const noopOpenOverlayChange = () => undefined;
-const noopCompactRevealChange = (_index: number | null) => undefined;
 
 const MeasurementTree = React.forwardRef<
   HTMLDivElement,
@@ -762,8 +588,6 @@ const MeasurementTree = React.forwardRef<
     clickableLeftOfEllipsis: boolean;
     strings: ResponsiveBreadcrumbStrings;
     focusRing: BreadcrumbFocusRing;
-    compactReveal?: ResponsiveBreadcrumbProps["compactReveal"];
-    animateLayout: BreadcrumbAnimation;
     isRtl: boolean;
   }
 >(function MeasurementTree(
@@ -792,8 +616,6 @@ const MeasurementTree = React.forwardRef<
     clickableLeftOfEllipsis,
     strings,
     focusRing,
-    compactReveal,
-    animateLayout,
     isRtl,
   },
   ref,
@@ -813,9 +635,6 @@ const MeasurementTree = React.forwardRef<
     getEllipsisMeasurementNode(items.length),
   ];
   const titleOnlyMeasurementLayout = titleOnlyLayout(0);
-  const compactMeasurementDisplays = Object.fromEntries(
-    items.map((_, index) => [index, { kind: "compact", tokenWidth: 0 }]),
-  ) as Record<number, BreadcrumbItemDisplay>;
   const sharedRendererProps = {
     items,
     isMobile,
@@ -843,14 +662,7 @@ const MeasurementTree = React.forwardRef<
     clickableLeftOfEllipsis,
     separatorNavSide,
     overflowBehavior: "collapse" as const,
-    gapWidth: 0,
     truncatedWidths: {},
-    itemDisplays: {},
-    pathTruncation: undefined,
-    compactReveal,
-    compactRevealIndex: null,
-    onCompactRevealIndexChange: noopCompactRevealChange,
-    animateLayout,
     showTooltipOnTruncate: false,
     schema: "none" as const,
     showCurrentInNav,
@@ -886,13 +698,6 @@ const MeasurementTree = React.forwardRef<
         mode="measure"
         layout={titleOnlyMeasurementLayout}
         measurementScope="title-only"
-      />
-      <BreadcrumbRenderer
-        {...sharedRendererProps}
-        mode="measure"
-        layout={fullMeasurementLayout}
-        measurementScope="compact"
-        itemDisplays={compactMeasurementDisplays}
       />
     </div>
   );
@@ -935,7 +740,6 @@ function buildFullLayout({
 function computeTruncation({
   items,
   itemWidths,
-  compactTokenWidths,
   separatorWidths,
   availableWidth,
   gapWidth,
@@ -946,15 +750,9 @@ function computeTruncation({
   truncateMaxWidth,
   truncateThreshold,
   truncateOrder,
-  truncationMode,
-  compactRevealIndex,
-  compactReveal,
-  alwaysShowHead,
-  alwaysShowTail,
 }: {
   items: BreadcrumbData[];
   itemWidths: number[];
-  compactTokenWidths: number[];
   separatorWidths: number[];
   availableWidth: number;
   gapWidth: number;
@@ -965,18 +763,12 @@ function computeTruncation({
   truncateMaxWidth: number;
   truncateThreshold: number;
   truncateOrder: "biggest-first" | "smallest-first";
-  truncationMode: BreadcrumbTruncationMode;
-  compactRevealIndex: number | null;
-  compactReveal?: ResponsiveBreadcrumbProps["compactReveal"];
-  alwaysShowHead: number;
-  alwaysShowTail: number;
 }) {
   const effectiveItemWidths = itemWidths.map((width) => width ?? 0);
   const truncatedWidths: Record<number, number> = {};
-  const displays: Record<number, BreadcrumbItemDisplay> = {};
 
   if (!enabled || items.length === 0) {
-    return { itemWidths: effectiveItemWidths, truncatedWidths, displays };
+    return { itemWidths: effectiveItemWidths, truncatedWidths };
   }
 
   let overflow =
@@ -992,24 +784,7 @@ function computeTruncation({
     ) - availableWidth;
 
   if (overflow <= 0) {
-    return { itemWidths: effectiveItemWidths, truncatedWidths, displays };
-  }
-
-  if (truncationMode === "compact-reveal") {
-    return computeCompactRevealTruncation({
-      items,
-      itemWidths: effectiveItemWidths,
-      compactTokenWidths,
-      separatorWidths,
-      availableWidth,
-      gapWidth,
-      includeNextArrow,
-      nextArrowWidth,
-      compactRevealIndex,
-      compactReveal,
-      alwaysShowHead,
-      alwaysShowTail,
-    });
+    return { itemWidths: effectiveItemWidths, truncatedWidths };
   }
 
   const minWidth = Math.max(1, truncateMinWidth);
@@ -1045,85 +820,10 @@ function computeTruncation({
 
     effectiveItemWidths[candidate.index] = nextWidth;
     truncatedWidths[candidate.index] = nextWidth;
-    displays[candidate.index] = {
-      kind: truncationMode === "path-start-end" ? "path-start-end" : "width",
-      width: nextWidth,
-    };
     overflow -= candidate.width - nextWidth;
   }
 
-  return { itemWidths: effectiveItemWidths, truncatedWidths, displays };
-}
-
-function computeCompactRevealTruncation({
-  items,
-  itemWidths,
-  compactTokenWidths,
-  separatorWidths,
-  availableWidth,
-  gapWidth,
-  includeNextArrow,
-  nextArrowWidth,
-  compactRevealIndex,
-  compactReveal,
-  alwaysShowHead,
-  alwaysShowTail,
-}: {
-  items: BreadcrumbData[];
-  itemWidths: number[];
-  compactTokenWidths: number[];
-  separatorWidths: number[];
-  availableWidth: number;
-  gapWidth: number;
-  includeNextArrow: boolean;
-  nextArrowWidth: number;
-  compactRevealIndex: number | null;
-  compactReveal?: ResponsiveBreadcrumbProps["compactReveal"];
-  alwaysShowHead: number;
-  alwaysShowTail: number;
-}) {
-  const effectiveItemWidths = itemWidths.map((width) => width ?? 0);
-  const truncatedWidths: Record<number, number> = {};
-  const displays: Record<number, BreadcrumbItemDisplay> = {};
-  const headCount = compactReveal?.alwaysShowHead ?? alwaysShowHead;
-  const tailCount = compactReveal?.alwaysShowTail ?? alwaysShowTail;
-
-  items.forEach((item, index) => {
-    const pinnedByHead = index < headCount;
-    const pinnedByTail = index >= items.length - tailCount;
-    const revealed = compactRevealIndex === index;
-    const canCompact =
-      getCanTruncate(item, index, items.length) &&
-      !pinnedByHead &&
-      !pinnedByTail &&
-      !revealed;
-    const tokenWidth = compactTokenWidths[index] ?? 0;
-
-    if (!canCompact || tokenWidth <= 0 || tokenWidth >= effectiveItemWidths[index]) {
-      return;
-    }
-
-    effectiveItemWidths[index] = tokenWidth;
-    truncatedWidths[index] = tokenWidth;
-    displays[index] = { kind: "compact", tokenWidth };
-  });
-
-  const compactWidth = getLayoutWidth(
-    buildFullLayout({
-      items,
-      itemWidths: effectiveItemWidths,
-      separatorWidths,
-      includeNextArrow,
-      nextArrowWidth,
-    }),
-    gapWidth,
-  );
-
-  if (compactWidth > availableWidth) {
-    return { itemWidths: effectiveItemWidths, truncatedWidths, displays };
-  }
-
-  return { itemWidths: effectiveItemWidths, truncatedWidths, displays };
+  return { itemWidths: effectiveItemWidths, truncatedWidths };
 }
 
 function titleOnlyLayout(width: number): LayoutNode[] {

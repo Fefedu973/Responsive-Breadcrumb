@@ -4,15 +4,9 @@ export {
   ResponsiveBreadcrumb,
 } from "./ResponsiveBreadcrumb";
 export type {
-  BreadcrumbAnimation,
-  BreadcrumbCompactRevealOptions,
   BreadcrumbData,
   BreadcrumbDebugState,
   BreadcrumbFocusRing,
-  BreadcrumbItemDisplay,
-  BreadcrumbPathTruncationOptions,
-  BreadcrumbSelectedRing,
-  BreadcrumbTruncationMode,
   CollapsePreference,
   CollapseStrategy,
   LayoutNode,
