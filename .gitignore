@@ -2,3 +2,7 @@ node_modules
 .turbo
 .alchemy
 .env
+.codex-logs/
+docs/
+specifications.md
+apps/web/src/components/responsive/TODO_BREADCRUMB.md

@@ -30,8 +30,7 @@ export default function RootLayout({
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>
 				<Providers>
-					<div className="grid grid-rows-[auto_1fr] h-svh">
-						<Header />
+					<div data-vaul-drawer-wrapper >
 						{children}
 					</div>
 				</Providers>
