@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import type {
   BreadcrumbData,
+  BreadcrumbFocusRing,
   LayoutNode,
   MeasurementMode,
   ResponsiveBreadcrumbProps,
@@ -71,6 +72,7 @@ export interface BreadcrumbRendererProps {
   clickableLeftOfEllipsis: boolean;
   separatorNavSide: "right" | "left";
   overflowBehavior: "collapse" | "scroll" | "wrap";
+  focusRing: BreadcrumbFocusRing;
   truncatedWidths: Record<number, number>;
   showTooltipOnTruncate: boolean;
   schema: "json-ld" | "microdata" | "none";
@@ -110,6 +112,7 @@ export function BreadcrumbRenderer({
   clickableLeftOfEllipsis,
   separatorNavSide,
   overflowBehavior,
+  focusRing,
   truncatedWidths,
   showTooltipOnTruncate,
   schema,
@@ -120,6 +123,7 @@ export function BreadcrumbRenderer({
 }: BreadcrumbRendererProps) {
   const isMeasure = mode === "measure";
   const titleOnlyNode = layout.find((node) => node.type === "title-only");
+  const focusRingClass = getFocusRingClass(focusRing);
 
   if (titleOnlyNode) {
     return (
@@ -168,7 +172,10 @@ export function BreadcrumbRenderer({
           overflowBehavior === "wrap"
             ? "flex-wrap whitespace-normal"
             : "!flex-nowrap whitespace-nowrap",
-          overflowBehavior === "collapse" && "overflow-hidden",
+          overflowBehavior === "collapse" &&
+            (focusRing === "clip-margin"
+              ? "overflow-clip [overflow-clip-margin:4px]"
+              : "overflow-hidden"),
           debug && "outline outline-1 outline-blue-500/50",
         )}
         {...(schema === "microdata"
@@ -208,6 +215,7 @@ export function BreadcrumbRenderer({
                 showTooltipOnTruncate={showTooltipOnTruncate}
                 schema={schema}
                 strings={strings}
+                focusRingClass={focusRingClass}
               />
             );
           }
@@ -236,6 +244,7 @@ export function BreadcrumbRenderer({
                 separatorNavSide={separatorNavSide}
                 showCurrentInNav={showCurrentInNav}
                 debug={debug}
+                focusRingClass={focusRingClass}
               />
             );
           }
@@ -260,6 +269,7 @@ export function BreadcrumbRenderer({
                 showCollapsedCount={showCollapsedCount}
                 strings={strings}
                 debug={debug}
+                focusRingClass={focusRingClass}
               />
             );
           }
@@ -280,6 +290,7 @@ export function BreadcrumbRenderer({
                 renderMenuLink={renderMenuLink}
                 strings={strings}
                 debug={debug}
+                focusRingClass={focusRingClass}
               />
             );
           }
@@ -289,6 +300,18 @@ export function BreadcrumbRenderer({
       </BreadcrumbList>
     </Breadcrumb>
   );
+}
+
+function getFocusRingClass(focusRing: BreadcrumbFocusRing) {
+  if (focusRing === "none") {
+    return "focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none";
+  }
+
+  if (focusRing === "inset") {
+    return "outline-none transition-all focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset";
+  }
+
+  return "outline-none transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 }
 
 function RenderedItem({
@@ -308,6 +331,7 @@ function RenderedItem({
   showTooltipOnTruncate,
   schema,
   strings,
+  focusRingClass,
 }: {
   item: BreadcrumbData;
   index: number;
@@ -325,6 +349,7 @@ function RenderedItem({
   showTooltipOnTruncate: boolean;
   schema: "json-ld" | "microdata" | "none";
   strings: ResponsiveBreadcrumbStrings;
+  focusRingClass: string;
 }) {
   const interactive = isInteractiveItem(item, current, lastItemClickable);
   const content = renderItem?.({ item, index, mode, current }) ?? (
@@ -339,8 +364,10 @@ function RenderedItem({
   const itemStyle = truncatedWidth
     ? ({ maxWidth: `${truncatedWidth}px` } satisfies React.CSSProperties)
     : undefined;
-  const itemClassName =
-    "inline-flex min-w-0 max-w-full shrink-0 items-center gap-1.5 truncate";
+  const itemClassName = cn(
+    "inline-flex min-w-0 max-w-full shrink-0 items-center gap-1.5 truncate rounded-md transition-all",
+    focusRingClass,
+  );
   const itemElement = interactive && item.href ? (
     <BreadcrumbLink asChild className={itemClassName} style={itemStyle}>
       {renderItemLink?.({
@@ -468,6 +495,7 @@ function RenderedSeparator({
   separatorNavSide,
   showCurrentInNav,
   debug,
+  focusRingClass,
 }: {
   node: Extract<LayoutNode, { type: "separator" }>;
   layout: LayoutNode[];
@@ -489,6 +517,7 @@ function RenderedSeparator({
   separatorNavSide: "right" | "left";
   showCurrentInNav: "never" | "with-others" | "always";
   debug: boolean;
+  focusRingClass: string;
 }) {
   const previousItem = items[node.after];
   const nextNode = layout[nodeIndex + 1];
@@ -552,7 +581,7 @@ function RenderedSeparator({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="group size-7 text-muted-foreground"
+            className={cn("group size-7 text-muted-foreground", focusRingClass)}
             tabIndex={isMeasure ? -1 : undefined}
             aria-label={label}
           >
@@ -595,6 +624,7 @@ function RenderedEllipsis({
   showCollapsedCount,
   strings,
   debug,
+  focusRingClass,
 }: {
   node: Extract<LayoutNode, { type: "ellipsis" }>;
   items: BreadcrumbData[];
@@ -612,6 +642,7 @@ function RenderedEllipsis({
   showCollapsedCount: boolean;
   strings: ResponsiveBreadcrumbStrings;
   debug: boolean;
+  focusRingClass: string;
 }) {
   const hiddenItems = items.slice(node.from, node.to + 1);
   const overlayId = `ellipsis-${node.from}-${node.to}`;
@@ -639,7 +670,7 @@ function RenderedEllipsis({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="size-8 px-0"
+            className={cn("size-8 px-0", focusRingClass)}
             aria-label={label}
             tabIndex={isMeasure ? -1 : undefined}
           >
@@ -675,6 +706,7 @@ function RenderedNext({
   renderMenuLink,
   strings,
   debug,
+  focusRingClass,
 }: {
   nextItems: SeparatorNavItem[];
   mode: MeasurementMode;
@@ -688,6 +720,7 @@ function RenderedNext({
   renderMenuLink?: ResponsiveBreadcrumbProps["renderMenuLink"];
   strings: ResponsiveBreadcrumbStrings;
   debug: boolean;
+  focusRingClass: string;
 }) {
   const overlayId = "next";
 
@@ -708,7 +741,10 @@ function RenderedNext({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="group size-8 px-0 text-muted-foreground"
+            className={cn(
+              "group size-8 px-0 text-muted-foreground",
+              focusRingClass,
+            )}
             aria-label={resolveLabel(strings.nextItems)}
             disabled={nextItems.length === 0}
             tabIndex={isMeasure ? -1 : undefined}

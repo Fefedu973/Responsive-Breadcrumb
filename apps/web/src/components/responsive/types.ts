@@ -7,6 +7,7 @@ export type CollapsePreference =
   | "none";
 
 export type MeasurementMode = "visible" | "measure" | "menu";
+export type BreadcrumbFocusRing = "inset" | "outer" | "clip-margin" | "none";
 
 export interface BreadcrumbData {
   key: string;
@@ -184,6 +185,8 @@ export interface ResponsiveBreadcrumbProps {
   lockOnOverlayOpen?: boolean;
   /** Collapse by default, or render all items with native scroll/wrap behavior. */
   overflowBehavior?: "collapse" | "scroll" | "wrap";
+  /** Focus ring style for breadcrumb focusable elements. Defaults to inset in collapse mode. */
+  focusRing?: BreadcrumbFocusRing;
   /** Forces title-only rendering at or below this measured container width. */
   fallbackAtWidth?: number;
   lastItemClickable?: boolean;

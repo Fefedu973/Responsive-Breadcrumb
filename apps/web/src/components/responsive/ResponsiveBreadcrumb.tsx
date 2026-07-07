@@ -13,6 +13,7 @@ import {
 import type {
   BreadcrumbData,
   BreadcrumbDebugState,
+  BreadcrumbFocusRing,
   LayoutNode,
   ResponsiveBreadcrumbProps,
   ResponsiveBreadcrumbStrings,
@@ -73,6 +74,7 @@ export function ResponsiveBreadcrumb({
   isLoading = false,
   lockOnOverlayOpen = true,
   overflowBehavior = "collapse",
+  focusRing,
   fallbackAtWidth,
   lastItemClickable = false,
   schema = "json-ld",
@@ -99,6 +101,8 @@ export function ResponsiveBreadcrumb({
   const headCount = alwaysShow?.head ?? 1;
   const tailCount = alwaysShow?.tail ?? 1;
   const includeNextArrow = showNextArrow && nextItems.length > 0;
+  const resolvedFocusRing =
+    focusRing ?? (overflowBehavior === "collapse" ? "inset" : "outer");
   const resolvedStrings = React.useMemo(
     () => ({ ...DEFAULT_STRINGS, ...strings }),
     [strings],
@@ -480,6 +484,7 @@ export function ResponsiveBreadcrumb({
       clickableLeftOfEllipsis={clickableLeftOfEllipsis}
       separatorNavSide={separatorNavSide}
       overflowBehavior={overflowBehavior}
+      focusRing={resolvedFocusRing}
       truncatedWidths={truncation.truncatedWidths}
       showTooltipOnTruncate={showTooltipOnTruncate}
       schema={schema}
@@ -494,6 +499,7 @@ export function ResponsiveBreadcrumb({
       ref={containerRef}
       className={cn("relative min-w-0 max-w-full", className)}
       data-responsive-breadcrumb=""
+      data-focus-ring={resolvedFocusRing}
     >
       {schemaJson ? (
         <script
@@ -533,6 +539,7 @@ export function ResponsiveBreadcrumb({
         showCollapsedCount={showCollapsedCount}
         clickableLeftOfEllipsis={clickableLeftOfEllipsis}
         strings={resolvedStrings}
+        focusRing={resolvedFocusRing}
         isRtl={isRtl}
       />
     </div>
@@ -546,6 +553,7 @@ export type {
   BreadcrumbDebugState,
   CollapsePreference,
   CollapseStrategy,
+  BreadcrumbFocusRing,
   LayoutNode,
   ResponsiveBreadcrumbProps,
   SeparatorNavItem,
@@ -579,6 +587,7 @@ const MeasurementTree = React.forwardRef<
     showCollapsedCount: boolean;
     clickableLeftOfEllipsis: boolean;
     strings: ResponsiveBreadcrumbStrings;
+    focusRing: BreadcrumbFocusRing;
     isRtl: boolean;
   }
 >(function MeasurementTree(
@@ -606,6 +615,7 @@ const MeasurementTree = React.forwardRef<
     showCollapsedCount,
     clickableLeftOfEllipsis,
     strings,
+    focusRing,
     isRtl,
   },
   ref,
@@ -657,6 +667,7 @@ const MeasurementTree = React.forwardRef<
     schema: "none" as const,
     showCurrentInNav,
     debug: false,
+    focusRing,
     isRtl,
   } satisfies Omit<
     React.ComponentProps<typeof BreadcrumbRenderer>,
