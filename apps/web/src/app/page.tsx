@@ -2009,18 +2009,10 @@ export default function Home() {
                                             style={{ width: `${animateLayoutWidth}px`, maxWidth: "100%" }}
                                         >
                                             <ResponsiveBreadcrumb
-                                                items={scenarios.compactReveal}
+                                                items={scenarios.tree}
                                                 strategy="center"
                                                 preference="minimize-count"
-                                                showHomeIcon={false}
-                                                enableTruncation
-                                                truncationMode="compact-reveal"
-                                                compactReveal={{
-                                                    token: "..",
-                                                    revealOn: "both",
-                                                    alwaysShowHead: 0,
-                                                    alwaysShowTail: 1,
-                                                }}
+                                                showHomeIcon
                                                 overflowBehavior="collapse"
                                                 focusRing="inset"
                                                 animateLayout={{ layout: true, presence: true, truncate: true, duration: 300 }}

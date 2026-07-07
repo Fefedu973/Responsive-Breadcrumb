@@ -216,6 +216,9 @@ export function ResponsiveBreadcrumb({
 
   const buildLayoutForWidths = React.useCallback(
     (itemWidths: number[], fullLayoutForWidths: LayoutNode[]) => {
+      const protectedRevealIndex =
+        truncationMode === "compact-reveal" ? compactRevealIndex : null;
+
       if (items.length === 0) {
         return [];
       }
@@ -255,12 +258,20 @@ export function ResponsiveBreadcrumb({
         options: {
           strategy,
           preference,
-          canCollapse: items.map((item, index) =>
-            getCanCollapse(item, index, items.length),
-          ),
-          forcedCollapsed: items.map((item, index) =>
-            forceCollapse?.(item, index) ?? false,
-          ),
+          canCollapse: items.map((item, index) => {
+            if (index === protectedRevealIndex) {
+              return false;
+            }
+
+            return getCanCollapse(item, index, items.length);
+          }),
+          forcedCollapsed: items.map((item, index) => {
+            if (index === protectedRevealIndex) {
+              return false;
+            }
+
+            return forceCollapse?.(item, index) ?? false;
+          }),
           itemPriority: itemPriority
             ? items.map((item, index) => itemPriority(item, index))
             : undefined,
@@ -274,6 +285,7 @@ export function ResponsiveBreadcrumb({
     },
     [
       allowMultipleEllipses,
+      compactRevealIndex,
       customLoadingFallback,
       fallbackAtWidth,
       forceCollapse,
@@ -295,6 +307,7 @@ export function ResponsiveBreadcrumb({
       separatorWidths,
       strategy,
       tailCount,
+      truncationMode,
     ],
   );
 
@@ -615,6 +628,7 @@ export function ResponsiveBreadcrumb({
       separatorNavSide={separatorNavSide}
       overflowBehavior={overflowBehavior}
       focusRing={resolvedFocusRing}
+      gapWidth={measurements.gap}
       truncatedWidths={truncation.truncatedWidths}
       itemDisplays={truncation.displays}
       pathTruncation={pathTruncation}
@@ -829,6 +843,7 @@ const MeasurementTree = React.forwardRef<
     clickableLeftOfEllipsis,
     separatorNavSide,
     overflowBehavior: "collapse" as const,
+    gapWidth: 0,
     truncatedWidths: {},
     itemDisplays: {},
     pathTruncation: undefined,

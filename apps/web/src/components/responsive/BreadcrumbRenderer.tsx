@@ -50,6 +50,21 @@ type NormalizedAnimation = {
   truncate: boolean;
   duration: number;
 };
+type AnimatedPhase = "entering" | "present" | "exiting";
+type AnimatedBreadcrumbNode = {
+  key: string;
+  node: LayoutNode;
+  phase: AnimatedPhase;
+  width: number;
+  order: number;
+};
+type NodeAnimationState = {
+  phase: AnimatedPhase;
+  width: number;
+  duration: number;
+  gapWidth: number;
+  isLast: boolean;
+};
 
 export interface BreadcrumbRendererProps {
   items: BreadcrumbData[];
@@ -82,6 +97,7 @@ export interface BreadcrumbRendererProps {
   separatorNavSide: "right" | "left";
   overflowBehavior: "collapse" | "scroll" | "wrap";
   focusRing: BreadcrumbFocusRing;
+  gapWidth: number;
   truncatedWidths: Record<number, number>;
   itemDisplays: Record<number, BreadcrumbItemDisplay>;
   pathTruncation?: BreadcrumbPathTruncationOptions;
@@ -128,6 +144,7 @@ export function BreadcrumbRenderer({
   separatorNavSide,
   overflowBehavior,
   focusRing,
+  gapWidth,
   truncatedWidths,
   itemDisplays,
   pathTruncation,
@@ -146,6 +163,50 @@ export function BreadcrumbRenderer({
   const titleOnlyNode = layout.find((node) => node.type === "title-only");
   const focusRingClass = getFocusRingClass(focusRing);
   const animation = normalizeAnimation(animateLayout);
+  const animatePresence = mode === "visible" && animation.presence;
+  const animatedNodes = useAnimatedBreadcrumbNodes({
+    layout,
+    enabled: animatePresence,
+    duration: animation.duration,
+    itemCount: items.length,
+  });
+  const compactRevealClearTimerRef = React.useRef<number | null>(null);
+  const revealCompactIndex = React.useCallback(
+    (index: number) => {
+      if (compactRevealClearTimerRef.current !== null) {
+        window.clearTimeout(compactRevealClearTimerRef.current);
+        compactRevealClearTimerRef.current = null;
+      }
+
+      onCompactRevealIndexChange(index);
+    },
+    [onCompactRevealIndexChange],
+  );
+  const clearCompactIndexSoon = React.useCallback(
+    (index: number) => {
+      if (compactRevealClearTimerRef.current !== null) {
+        window.clearTimeout(compactRevealClearTimerRef.current);
+      }
+
+      compactRevealClearTimerRef.current = window.setTimeout(() => {
+        compactRevealClearTimerRef.current = null;
+
+        if (compactRevealIndex === index) {
+          onCompactRevealIndexChange(null);
+        }
+      }, 60);
+    },
+    [compactRevealIndex, onCompactRevealIndexChange],
+  );
+
+  React.useEffect(
+    () => () => {
+      if (compactRevealClearTimerRef.current !== null) {
+        window.clearTimeout(compactRevealClearTimerRef.current);
+      }
+    },
+    [],
+  );
 
   if (titleOnlyNode) {
     return (
@@ -200,6 +261,7 @@ export function BreadcrumbRenderer({
             (focusRing === "clip-margin"
               ? "overflow-clip [overflow-clip-margin:4px]"
               : "overflow-hidden"),
+          animatePresence && "[gap:0]",
           debug && "outline outline-1 outline-blue-500/50",
         )}
         {...(schema === "microdata"
@@ -212,7 +274,23 @@ export function BreadcrumbRenderer({
           isMeasure && measurementScope === "full" ? "full" : undefined
         }
       >
-        {layout.map((node, nodeIndex) => {
+        {animatedNodes.map((animatedNode, animatedNodeIndex) => {
+          const node = animatedNode.node;
+          const targetNodeIndex = layout.findIndex(
+            (candidate) => getLayoutNodeKey(candidate) === animatedNode.key,
+          );
+          const nodeIndex =
+            targetNodeIndex >= 0 ? targetNodeIndex : animatedNodeIndex;
+          const nodeAnimationState = animatePresence
+            ? {
+                phase: animatedNode.phase,
+                width: animatedNode.width,
+                duration: animation.duration,
+                gapWidth,
+                isLast: animatedNodeIndex === animatedNodes.length - 1,
+              }
+            : undefined;
+
           if (node.type === "item") {
             const item = items[node.index];
 
@@ -222,7 +300,7 @@ export function BreadcrumbRenderer({
 
             return (
               <RenderedItem
-                key={`item-${node.index}`}
+                key={animatedNode.key}
                 item={item}
                 index={node.index}
                 current={node.index === items.length - 1}
@@ -240,12 +318,14 @@ export function BreadcrumbRenderer({
                 pathTruncation={pathTruncation}
                 compactReveal={compactReveal}
                 compactRevealIndex={compactRevealIndex}
-                onCompactRevealIndexChange={onCompactRevealIndexChange}
+                onCompactReveal={revealCompactIndex}
+                onCompactRevealClear={clearCompactIndexSoon}
                 animation={animation}
                 showTooltipOnTruncate={showTooltipOnTruncate}
                 schema={schema}
                 strings={strings}
                 focusRingClass={focusRingClass}
+                animationState={nodeAnimationState}
               />
             );
           }
@@ -253,7 +333,7 @@ export function BreadcrumbRenderer({
           if (node.type === "separator") {
             return (
               <RenderedSeparator
-                key={`separator-${node.after}-${nodeIndex}`}
+                key={animatedNode.key}
                 node={node}
                 layout={layout}
                 nodeIndex={nodeIndex}
@@ -276,6 +356,11 @@ export function BreadcrumbRenderer({
                 debug={debug}
                 focusRingClass={focusRingClass}
                 animation={animation}
+                compactReveal={compactReveal}
+                compactRevealIndex={compactRevealIndex}
+                onCompactReveal={revealCompactIndex}
+                onCompactRevealClear={clearCompactIndexSoon}
+                animationState={nodeAnimationState}
               />
             );
           }
@@ -283,7 +368,7 @@ export function BreadcrumbRenderer({
           if (node.type === "ellipsis") {
             return (
               <RenderedEllipsis
-                key={`ellipsis-${node.from}-${node.to}`}
+                key={animatedNode.key}
                 node={node}
                 items={items}
                 mode={mode}
@@ -302,6 +387,7 @@ export function BreadcrumbRenderer({
                 debug={debug}
                 focusRingClass={focusRingClass}
                 animation={animation}
+                animationState={nodeAnimationState}
               />
             );
           }
@@ -309,7 +395,7 @@ export function BreadcrumbRenderer({
           if (node.type === "next" && showNextArrow) {
             return (
               <RenderedNext
-                key="next"
+                key={animatedNode.key}
                 nextItems={nextItems}
                 mode={mode}
                 isMeasure={isMeasure}
@@ -324,6 +410,7 @@ export function BreadcrumbRenderer({
                 debug={debug}
                 focusRingClass={focusRingClass}
                 animation={animation}
+                animationState={nodeAnimationState}
               />
             );
           }
@@ -393,6 +480,188 @@ function getAnimationStyle(animation: NormalizedAnimation) {
     : undefined;
 }
 
+function useAnimatedBreadcrumbNodes({
+  layout,
+  enabled,
+  duration,
+  itemCount,
+}: {
+  layout: LayoutNode[];
+  enabled: boolean;
+  duration: number;
+  itemCount: number;
+}) {
+  const targetNodes = React.useMemo(
+    () => layout.map((node) => toAnimatedNode(node, itemCount, "present")),
+    [itemCount, layout],
+  );
+  const targetSignature = React.useMemo(
+    () =>
+      targetNodes
+        .map((node) => `${node.key}:${getLayoutNodeWidth(node.node)}`)
+        .join("|"),
+    [targetNodes],
+  );
+  const [renderNodes, setRenderNodes] =
+    React.useState<AnimatedBreadcrumbNode[]>(targetNodes);
+
+  React.useLayoutEffect(() => {
+    if (!enabled) {
+      setRenderNodes(targetNodes);
+      return;
+    }
+
+    const targetByKey = new Map(targetNodes.map((node) => [node.key, node]));
+
+    setRenderNodes((previousNodes) => {
+      const previousByKey = new Map(
+        previousNodes.map((node) => [node.key, node]),
+      );
+      const merged: AnimatedBreadcrumbNode[] = [];
+
+      for (const previousNode of previousNodes) {
+        const targetNode = targetByKey.get(previousNode.key);
+
+        if (targetNode) {
+          merged.push({
+            ...previousNode,
+            node: targetNode.node,
+            phase: "present",
+            width: targetNode.width,
+            order: targetNode.order,
+          });
+        } else {
+          merged.push({
+            ...previousNode,
+            phase: "exiting",
+            width: 0,
+          });
+        }
+      }
+
+      for (const targetNode of targetNodes) {
+        if (!previousByKey.has(targetNode.key)) {
+          merged.push({
+            ...targetNode,
+            phase: "entering",
+            width: 0,
+          });
+        }
+      }
+
+      return merged.sort((left, right) => left.order - right.order);
+    });
+
+    const frame = window.requestAnimationFrame(() => {
+      setRenderNodes((previousNodes) =>
+        previousNodes.map((node) => {
+          const targetNode = targetByKey.get(node.key);
+
+          if (!targetNode) {
+            return node;
+          }
+
+          return {
+            ...node,
+            node: targetNode.node,
+            phase: "present",
+            width: targetNode.width,
+            order: targetNode.order,
+          };
+        }),
+      );
+    });
+
+    const timeout = window.setTimeout(() => {
+      setRenderNodes((previousNodes) =>
+        previousNodes.filter((node) => node.phase !== "exiting"),
+      );
+    }, duration + 50);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [duration, enabled, targetNodes, targetSignature]);
+
+  return enabled ? renderNodes : targetNodes;
+}
+
+function getLayoutNodeKey(node: LayoutNode) {
+  switch (node.type) {
+    case "item":
+      return `item:${node.index}`;
+    case "separator":
+      return `separator:${node.after}`;
+    case "ellipsis":
+      return `ellipsis:${node.from}:${node.to}`;
+    case "next":
+      return "next";
+    case "title-only":
+      return "title-only";
+  }
+}
+
+function getLayoutNodeOrder(node: LayoutNode, itemCount: number) {
+  switch (node.type) {
+    case "item":
+      return node.index * 2;
+    case "separator":
+      return node.after * 2 + 1;
+    case "ellipsis":
+      return ((node.from + node.to) / 2) * 2;
+    case "next":
+      return itemCount * 2 + 2;
+    case "title-only":
+      return -1;
+  }
+}
+
+function getLayoutNodeWidth(node: LayoutNode) {
+  return Math.ceil(node.width ?? 0);
+}
+
+function toAnimatedNode(
+  node: LayoutNode,
+  itemCount: number,
+  phase: AnimatedBreadcrumbNode["phase"],
+  width = getLayoutNodeWidth(node),
+): AnimatedBreadcrumbNode {
+  return {
+    key: getLayoutNodeKey(node),
+    node,
+    phase,
+    width,
+    order: getLayoutNodeOrder(node, itemCount),
+  };
+}
+
+function getNodeAnimationStyle(
+  animationState?: NodeAnimationState,
+): React.CSSProperties | undefined {
+  if (!animationState) {
+    return undefined;
+  }
+
+  const { phase, width, duration, gapWidth, isLast } = animationState;
+  const inactive = phase === "exiting" || phase === "entering";
+
+  return {
+    width,
+    maxWidth: width,
+    flexBasis: width,
+    marginInlineEnd: isLast || inactive ? 0 : gapWidth,
+    opacity: inactive ? 0 : 1,
+    overflow: "hidden",
+    transform: phase === "exiting" ? "scale(0.96)" : "scale(1)",
+    transitionDuration: `${duration}ms`,
+    transitionProperty:
+      "width,max-width,flex-basis,margin-inline-end,opacity,transform",
+    transitionTimingFunction: "cubic-bezier(0.2, 0, 0, 1)",
+    willChange: "width,max-width,flex-basis,margin-inline-end,opacity,transform",
+  };
+}
+
 function mergeStyles(
   ...styles: Array<React.CSSProperties | undefined>
 ): React.CSSProperties | undefined {
@@ -417,7 +686,8 @@ function getCompactRevealProps({
   enabled,
   revealOn,
   currentIndex,
-  onChange,
+  onReveal,
+  onClear,
 }: {
   index: number;
   enabled: boolean;
@@ -425,7 +695,8 @@ function getCompactRevealProps({
     NonNullable<ResponsiveBreadcrumbProps["compactReveal"]>["revealOn"]
   >;
   currentIndex: number | null;
-  onChange: (index: number | null) => void;
+  onReveal: (index: number) => void;
+  onClear: (index: number) => void;
 }) {
   if (!enabled) {
     return {};
@@ -433,20 +704,20 @@ function getCompactRevealProps({
 
   const clear = () => {
     if (currentIndex === index) {
-      onChange(null);
+      onClear(index);
     }
   };
 
   return {
     onMouseEnter:
       revealOn === "hover" || revealOn === "both"
-        ? () => onChange(index)
+        ? () => onReveal(index)
         : undefined,
     onMouseLeave:
       revealOn === "hover" || revealOn === "both" ? clear : undefined,
     onFocus:
       revealOn === "focus" || revealOn === "both"
-        ? () => onChange(index)
+        ? () => onReveal(index)
         : undefined,
     onBlur: revealOn === "focus" || revealOn === "both" ? clear : undefined,
   };
@@ -470,12 +741,14 @@ function RenderedItem({
   pathTruncation,
   compactReveal,
   compactRevealIndex,
-  onCompactRevealIndexChange,
+  onCompactReveal,
+  onCompactRevealClear,
   animation,
   showTooltipOnTruncate,
   schema,
   strings,
   focusRingClass,
+  animationState,
 }: {
   item: BreadcrumbData;
   index: number;
@@ -494,14 +767,17 @@ function RenderedItem({
   pathTruncation?: BreadcrumbPathTruncationOptions;
   compactReveal?: ResponsiveBreadcrumbProps["compactReveal"];
   compactRevealIndex: number | null;
-  onCompactRevealIndexChange: (index: number | null) => void;
+  onCompactReveal: (index: number) => void;
+  onCompactRevealClear: (index: number) => void;
   animation: NormalizedAnimation;
   showTooltipOnTruncate: boolean;
   schema: "json-ld" | "microdata" | "none";
   strings: ResponsiveBreadcrumbStrings;
   focusRingClass: string;
+  animationState?: NodeAnimationState;
 }) {
   const interactive = isInteractiveItem(item, current, lastItemClickable);
+  const exiting = animationState?.phase === "exiting";
   const isCompact = display.kind === "compact";
   const readableItemLabel = readableLabel(
     item.label,
@@ -535,7 +811,8 @@ function RenderedItem({
     enabled: Boolean(compactReveal),
     revealOn: compactReveal?.revealOn ?? "both",
     currentIndex: compactRevealIndex,
-    onChange: onCompactRevealIndexChange,
+    onReveal: onCompactReveal,
+    onClear: onCompactRevealClear,
   });
   const itemClassName = cn(
     "inline-flex min-w-0 max-w-full shrink-0 items-center gap-1.5 truncate rounded-md transition-all",
@@ -550,6 +827,7 @@ function RenderedItem({
       aria-label={isCompact ? readableItemLabel : undefined}
       data-breadcrumb-item-index={index}
       data-breadcrumb-item-key={item.key}
+      tabIndex={exiting ? -1 : undefined}
       {...revealProps}
     >
       {renderItemLink?.({
@@ -559,13 +837,22 @@ function RenderedItem({
         current,
         href: item.href,
         children: contentWithSchema,
-        onClick: () => onItemClick?.(item),
+        onClick: () => {
+          if (!exiting) {
+            onItemClick?.(item);
+          }
+        },
         ariaDisabled: item.disabled,
         itemProp: schema === "microdata" ? "item" : undefined,
       }) ?? (
         <a
           href={item.href}
-          onClick={() => onItemClick?.(item)}
+          tabIndex={exiting ? -1 : undefined}
+          onClick={() => {
+            if (!exiting) {
+              onItemClick?.(item);
+            }
+          }}
           aria-disabled={item.disabled || undefined}
           itemProp={schema === "microdata" ? "item" : undefined}
         >
@@ -585,7 +872,12 @@ function RenderedItem({
       aria-label={isCompact ? readableItemLabel : undefined}
       data-breadcrumb-item-index={index}
       data-breadcrumb-item-key={item.key}
-      onClick={() => onItemClick?.(item)}
+      tabIndex={exiting ? -1 : undefined}
+      onClick={() => {
+        if (!exiting) {
+          onItemClick?.(item);
+        }
+      }}
       {...revealProps}
     >
       {contentWithSchema}
@@ -597,6 +889,7 @@ function RenderedItem({
       aria-label={isCompact ? readableItemLabel : undefined}
       data-breadcrumb-item-index={index}
       data-breadcrumb-item-key={item.key}
+      aria-hidden={exiting ? true : undefined}
       {...revealProps}
     >
       {contentWithSchema}
@@ -625,15 +918,19 @@ function RenderedItem({
       data-measure-compact-token={
         isMeasure && measurementScope === "compact" ? index : undefined
       }
+      data-animation-phase={animationState?.phase}
       itemProp={schema === "microdata" ? "itemListElement" : undefined}
       itemScope={schema === "microdata" ? true : undefined}
       itemType={
         schema === "microdata" ? "https://schema.org/ListItem" : undefined
       }
+      aria-hidden={exiting ? true : undefined}
       className={cn(
-        "min-w-0 max-w-full shrink-0",
+        "min-w-0 max-w-full shrink-0 overflow-hidden",
+        exiting && "pointer-events-none",
         debug && "outline outline-1 outline-green-500/60",
       )}
+      style={getNodeAnimationStyle(animationState)}
     >
       {renderedItem}
       {schema === "microdata" ? (
@@ -767,6 +1064,11 @@ function RenderedSeparator({
   debug,
   focusRingClass,
   animation,
+  compactReveal,
+  compactRevealIndex,
+  onCompactReveal,
+  onCompactRevealClear,
+  animationState,
 }: {
   node: Extract<LayoutNode, { type: "separator" }>;
   layout: LayoutNode[];
@@ -790,8 +1092,15 @@ function RenderedSeparator({
   debug: boolean;
   focusRingClass: string;
   animation: NormalizedAnimation;
+  compactReveal?: ResponsiveBreadcrumbProps["compactReveal"];
+  compactRevealIndex: number | null;
+  onCompactReveal: (index: number) => void;
+  onCompactRevealClear: (index: number) => void;
+  animationState?: NodeAnimationState;
 }) {
   const previousItem = items[node.after];
+  const exiting = animationState?.phase === "exiting";
+  const revealIndex = node.after;
   const nextNode = layout[nodeIndex + 1];
   const nextIndex =
     nextNode?.type === "item"
@@ -816,6 +1125,14 @@ function RenderedSeparator({
   const interactive =
     navItems.length > 0 &&
     (!leftOfEllipsis || clickableLeftOfEllipsis);
+  const revealProps = getCompactRevealProps({
+    index: revealIndex,
+    enabled: Boolean(compactReveal),
+    revealOn: compactReveal?.revealOn ?? "both",
+    currentIndex: compactRevealIndex,
+    onReveal: onCompactReveal,
+    onClear: onCompactRevealClear,
+  });
 
   if (!interactive) {
     return renderDecorativeSeparator({
@@ -825,6 +1142,9 @@ function RenderedSeparator({
       measureIndex:
         isMeasure && measurementScope === "full" ? node.after : null,
       debug,
+      revealIndex,
+      revealProps,
+      animationState,
     });
   }
 
@@ -841,7 +1161,16 @@ function RenderedSeparator({
         isMeasure && measurementScope === "full" ? node.after : undefined
       }
       data-slot="breadcrumb-interactive-separator"
-      className={cn(debug && "outline outline-1 outline-cyan-500/60")}
+      data-compact-reveal-target={revealIndex}
+      data-animation-phase={animationState?.phase}
+      aria-hidden={exiting ? true : undefined}
+      className={cn(
+        "overflow-hidden",
+        exiting && "pointer-events-none",
+        debug && "outline outline-1 outline-cyan-500/60",
+      )}
+      style={getNodeAnimationStyle(animationState)}
+      {...revealProps}
     >
       <ResponsiveOverlay
         title={label}
@@ -859,7 +1188,7 @@ function RenderedSeparator({
               getAnimationClass(animation, "presence"),
             )}
             style={getAnimationStyle(animation)}
-            tabIndex={isMeasure ? -1 : undefined}
+            tabIndex={isMeasure || exiting ? -1 : undefined}
             aria-label={label}
           >
             <ChevronRight
@@ -903,6 +1232,7 @@ function RenderedEllipsis({
   debug,
   focusRingClass,
   animation,
+  animationState,
 }: {
   node: Extract<LayoutNode, { type: "ellipsis" }>;
   items: BreadcrumbData[];
@@ -922,8 +1252,10 @@ function RenderedEllipsis({
   debug: boolean;
   focusRingClass: string;
   animation: NormalizedAnimation;
+  animationState?: NodeAnimationState;
 }) {
   const hiddenItems = items.slice(node.from, node.to + 1);
+  const exiting = animationState?.phase === "exiting";
   const overlayId = `ellipsis-${node.from}-${node.to}`;
   const label = resolveLabel(strings.showCollapsedItems, hiddenItems.length);
   const title = resolveLabel(strings.moreOptions);
@@ -937,7 +1269,14 @@ function RenderedEllipsis({
       data-measure-ellipsis={
         isMeasure && measurementScope === "ellipsis" ? "" : undefined
       }
-      className={cn(debug && "outline outline-1 outline-yellow-500/70")}
+      data-animation-phase={animationState?.phase}
+      aria-hidden={exiting ? true : undefined}
+      className={cn(
+        "overflow-hidden",
+        exiting && "pointer-events-none",
+        debug && "outline outline-1 outline-yellow-500/70",
+      )}
+      style={getNodeAnimationStyle(animationState)}
     >
       <ResponsiveOverlay
         title={title}
@@ -956,7 +1295,7 @@ function RenderedEllipsis({
             )}
             style={getAnimationStyle(animation)}
             aria-label={label}
-            tabIndex={isMeasure ? -1 : undefined}
+            tabIndex={isMeasure || exiting ? -1 : undefined}
           >
             {content}
           </Button>
@@ -992,6 +1331,7 @@ function RenderedNext({
   debug,
   focusRingClass,
   animation,
+  animationState,
 }: {
   nextItems: SeparatorNavItem[];
   mode: MeasurementMode;
@@ -1007,15 +1347,24 @@ function RenderedNext({
   debug: boolean;
   focusRingClass: string;
   animation: NormalizedAnimation;
+  animationState?: NodeAnimationState;
 }) {
   const overlayId = "next";
+  const exiting = animationState?.phase === "exiting";
 
   return (
     <BreadcrumbItem
       data-measure-next={
         isMeasure && measurementScope === "full" ? "" : undefined
       }
-      className={cn(debug && "outline outline-1 outline-purple-500/70")}
+      data-animation-phase={animationState?.phase}
+      aria-hidden={exiting ? true : undefined}
+      className={cn(
+        "overflow-hidden",
+        exiting && "pointer-events-none",
+        debug && "outline outline-1 outline-purple-500/70",
+      )}
+      style={getNodeAnimationStyle(animationState)}
     >
       <ResponsiveOverlay
         title={resolveLabel(strings.nextItems)}
@@ -1035,7 +1384,7 @@ function RenderedNext({
             style={getAnimationStyle(animation)}
             aria-label={resolveLabel(strings.nextItems)}
             disabled={nextItems.length === 0}
-            tabIndex={isMeasure ? -1 : undefined}
+            tabIndex={isMeasure || exiting ? -1 : undefined}
           >
             <ChevronRight
               className="size-4 transition-transform group-data-[state=open]:rotate-90"
@@ -1224,31 +1573,85 @@ function renderDecorativeSeparator({
   renderSeparator,
   measureIndex,
   debug,
+  revealIndex,
+  revealProps,
+  animationState,
 }: {
   previousKey: string;
   nextKey: string;
   renderSeparator?: ResponsiveBreadcrumbProps["renderSeparator"];
   measureIndex: number | null;
   debug: boolean;
+  revealIndex: number;
+  revealProps: React.HTMLAttributes<HTMLElement>;
+  animationState?: NodeAnimationState;
 }) {
   const rendered = renderSeparator?.(previousKey, nextKey);
   const debugClassName = debug ? "outline outline-1 outline-slate-500/60" : "";
+  const exiting = animationState?.phase === "exiting";
+  const animationClassName = cn(
+    "overflow-hidden",
+    exiting && "pointer-events-none",
+  );
 
-  if (React.isValidElement<{ className?: string }>(rendered)) {
+  if (React.isValidElement<React.HTMLAttributes<HTMLElement>>(rendered)) {
     return React.cloneElement(rendered, {
       "data-measure-separator": measureIndex ?? undefined,
-      className: cn(rendered.props.className, debugClassName),
+      "data-compact-reveal-target": revealIndex,
+      "data-animation-phase": animationState?.phase,
+      "aria-hidden": exiting ? true : rendered.props["aria-hidden"],
+      className: cn(rendered.props.className, animationClassName, debugClassName),
+      onBlur: composeHandlers(rendered.props.onBlur, revealProps.onBlur),
+      onFocus: composeHandlers(rendered.props.onFocus, revealProps.onFocus),
+      onMouseEnter: composeHandlers(
+        rendered.props.onMouseEnter,
+        revealProps.onMouseEnter,
+      ),
+      onMouseLeave: composeHandlers(
+        rendered.props.onMouseLeave,
+        revealProps.onMouseLeave,
+      ),
+      style: mergeStyles(
+        rendered.props.style,
+        getNodeAnimationStyle(animationState),
+      ),
     } as React.HTMLAttributes<HTMLElement>);
   }
 
   return (
     <BreadcrumbSeparator
       data-measure-separator={measureIndex ?? undefined}
-      className={debugClassName}
+      data-compact-reveal-target={revealIndex}
+      data-animation-phase={animationState?.phase}
+      aria-hidden={true}
+      className={cn(animationClassName, debugClassName)}
+      style={getNodeAnimationStyle(animationState)}
+      {...revealProps}
     >
       {rendered}
     </BreadcrumbSeparator>
   );
+}
+
+function composeHandlers<E extends React.SyntheticEvent>(
+  original?: (event: E) => void,
+  next?: (event: E) => void,
+) {
+  if (!original) {
+    return next;
+  }
+
+  if (!next) {
+    return original;
+  }
+
+  return (event: E) => {
+    original(event);
+
+    if (!event.defaultPrevented) {
+      next(event);
+    }
+  };
 }
 
 function getSeparatorNavItems(

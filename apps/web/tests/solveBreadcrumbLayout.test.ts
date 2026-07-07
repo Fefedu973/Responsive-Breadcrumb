@@ -159,4 +159,44 @@ assert.deepEqual(
   "forceCollapse keeps non-contiguous forced items as separate ellipses when multi-ellipsis is enabled",
 );
 
+const compactRevealTarget = 2;
+const compactRevealProtected = solveBreadcrumbLayout({
+  availableWidth: 250,
+  itemWidths: [40, 60, 90, 40],
+  separatorWidths: [8, 8, 8],
+  ellipsisWidth: 32,
+  nextArrowWidth: 0,
+  titleOnlyWidth: 40,
+  gapWidth: 4,
+  includeNextArrow: false,
+  options: {
+    strategy: "start",
+    preference: "minimize-count",
+    canCollapse: [false, true, false, false],
+    forcedCollapsed: [false, false, false, false],
+    alwaysShowHead: 1,
+    alwaysShowTail: 1,
+    allowTitleOnly: true,
+    allowMultipleEllipses: false,
+    grouping: "contiguous",
+  },
+});
+
+assert.equal(
+  compactRevealProtected.some(
+    (node) => node.type === "item" && node.index === compactRevealTarget,
+  ),
+  true,
+  "a compact reveal target marked non-collapsible stays visible",
+);
+
+assert.equal(
+  getLayoutRanges(compactRevealProtected).some(
+    (range) =>
+      compactRevealTarget >= range.a && compactRevealTarget <= range.b,
+  ),
+  false,
+  "collapsed ranges do not include the compact reveal target",
+);
+
 console.log("solveBreadcrumbLayout tests passed");
