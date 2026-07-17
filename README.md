@@ -6,6 +6,8 @@ The component measures its real rendered DOM in a hidden tree, solves the best l
 
 ## Demo
 
+https://github.com/user-attachments/assets/a1aa3f70-6ea0-4588-bd5d-cd86c62c46ce
+
 Live demo (GitHub Pages, deployed from `apps/web`):
 
 **<https://fefedu973.github.io/Responsive-Breadcrumb/>**
