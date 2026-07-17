@@ -19,10 +19,17 @@ export function useBreadcrumbMeasurements({
   containerRef,
   measureRef,
   locked,
+  measureKey,
 }: {
   containerRef: React.RefObject<HTMLElement | null>;
   measureRef: React.RefObject<HTMLElement | null>;
   locked: boolean;
+  /**
+   * Identity that changes whenever the measured content can change (items,
+   * renderers, layout-affecting props). Measuring is driven by this key and
+   * ResizeObserver events instead of running on every parent render.
+   */
+  measureKey: object;
 }) {
   const frameRef = React.useRef<number | null>(null);
   const lastSignatureRef = React.useRef("empty");
@@ -104,7 +111,7 @@ export function useBreadcrumbMeasurements({
         frameRef.current = null;
       }
     };
-  });
+  }, [measure, measureKey]);
 
   React.useLayoutEffect(() => {
     if (locked) {
@@ -121,9 +128,17 @@ export function useBreadcrumbMeasurements({
     const observer = new ResizeObserver(() => scheduleMeasure());
     observer.observe(container);
     observer.observe(measureRoot);
+    // The hidden root is height-0, so its own box never reflects children
+    // resizing (font swaps, late images…): observe every measured element.
+    // Re-running on measureKey re-attaches observers to freshly rendered nodes.
+    measureRoot
+      .querySelectorAll<HTMLElement>(
+        "[data-measure-item], [data-measure-separator], [data-measure-ellipsis], [data-measure-next], [data-measure-title-only]",
+      )
+      .forEach((element) => observer.observe(element));
 
     return () => observer.disconnect();
-  }, [containerRef, locked, measureRef, scheduleMeasure]);
+  }, [containerRef, locked, measureRef, measureKey, scheduleMeasure]);
 
   React.useEffect(() => {
     if (!("fonts" in document)) {

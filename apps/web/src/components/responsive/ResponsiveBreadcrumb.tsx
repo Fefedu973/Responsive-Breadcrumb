@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useMediaQuery } from "@/hooks/use-media-query";
-import { cn } from "@/lib/utils";
+import { useMediaQuery } from "../../hooks/use-media-query";
+import { cn } from "../../lib/utils";
 import { BreadcrumbRenderer } from "./BreadcrumbRenderer";
 import {
   getLayoutRange,
@@ -14,6 +14,7 @@ import type {
   BreadcrumbData,
   BreadcrumbDebugState,
   BreadcrumbFocusRing,
+  CollapsedCountPlacement,
   LayoutNode,
   ResponsiveBreadcrumbProps,
   ResponsiveBreadcrumbStrings,
@@ -33,8 +34,6 @@ const DEFAULT_STRINGS: ResponsiveBreadcrumbStrings = {
   noItemsAvailable: "No items available",
   itemLabelFallback: "item",
   truncatedItemTooltip: (label) => label,
-  measureEllipsis: "Measure ellipsis",
-  measureNextItems: "Measure next items",
 };
 
 export function ResponsiveBreadcrumb({
@@ -66,7 +65,7 @@ export function ResponsiveBreadcrumb({
   truncateOrder = "biggest-first",
   showTooltipOnTruncate = true,
   allowMultipleEllipses = false,
-  grouping = "contiguous",
+  grouping,
   showCurrentInNav = "never",
   loadingFallback = "none",
   customLoadingFallback,
@@ -79,6 +78,7 @@ export function ResponsiveBreadcrumb({
   lastItemClickable = false,
   schema = "json-ld",
   showCollapsedCount = false,
+  collapsedCountPlacement = "outside",
   strings,
   clickableLeftOfEllipsis = false,
   separatorNavSide = "right",
@@ -101,6 +101,13 @@ export function ResponsiveBreadcrumb({
   const headCount = alwaysShow?.head ?? 1;
   const tailCount = alwaysShow?.tail ?? 1;
   const includeNextArrow = showNextArrow && nextItems.length > 0;
+  // allowMultipleEllipses is inert with contiguous grouping, so it implies
+  // "smart" unless the caller picked a grouping explicitly.
+  const resolvedGrouping =
+    grouping ?? (allowMultipleEllipses ? "smart" : "contiguous");
+  // Only collapse mode consumes measurements; scroll/wrap render the full
+  // layout natively, so the hidden measurement tree can be skipped entirely.
+  const needsMeasurements = overflowBehavior === "collapse";
   const resolvedFocusRing =
     focusRing ?? (overflowBehavior === "collapse" ? "inset" : "outer");
   const resolvedStrings = React.useMemo(
@@ -112,10 +119,6 @@ export function ResponsiveBreadcrumb({
       return customLoadingFallback;
     }
 
-    if (isLoading && loadingFallback === "title") {
-      return titleOnlyFallback ?? items.at(-1)?.label ?? "";
-    }
-
     return titleOnlyFallback ?? items.at(-1)?.label ?? "";
   }, [
     customLoadingFallback,
@@ -124,10 +127,50 @@ export function ResponsiveBreadcrumb({
     loadingFallback,
     titleOnlyFallback,
   ]);
+  // Identity key for everything that can change the measured DOM. Re-measuring
+  // is driven by this key plus ResizeObserver events instead of every render.
+  // Callers that recreate these props each render simply fall back to the old
+  // measure-per-render behavior.
+  const measureKey = React.useMemo(
+    () => ({}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      items,
+      renderItem,
+      renderSeparator,
+      renderEllipsis,
+      renderTitleOnly,
+      renderMenuItem,
+      renderItemLink,
+      renderMenuLink,
+      showHomeIcon,
+      includeNextArrow,
+      nextItems,
+      separatorNavItems,
+      separatorNavSide,
+      showCurrentInNav,
+      resolvedTitleOnlyFallback,
+      titleOnlyIcon,
+      titleOnlyCustomElement,
+      customEllipsisElement,
+      lastItemClickable,
+      showCollapsedCount,
+      collapsedCountPlacement,
+      clickableLeftOfEllipsis,
+      resolvedStrings,
+      resolvedFocusRing,
+      isRtl,
+      isMobile,
+      // The measurement tree only mounts in collapse mode; changing modes must
+      // re-run the measurement effects once the tree is (un)mounted.
+      overflowBehavior,
+    ],
+  );
   const measurements = useBreadcrumbMeasurements({
     containerRef,
     measureRef,
     locked: measurementLocked,
+    measureKey,
   });
   const itemWidths = React.useMemo(
     () => normalizeMeasuredWidths(measurements.itemWidths, items.length),
@@ -151,8 +194,10 @@ export function ResponsiveBreadcrumb({
       return;
     }
 
-    const root = document.documentElement;
-    const computedDirection = window.getComputedStyle(root).direction;
+    // Read the inherited direction from the component's own container so a
+    // local dir="rtl" subtree is detected, not just the document root.
+    const element = containerRef.current ?? document.documentElement;
+    const computedDirection = window.getComputedStyle(element).direction;
     setDetectedDirection(computedDirection === "rtl" ? "rtl" : "ltr");
   }, [direction]);
 
@@ -228,7 +273,7 @@ export function ResponsiveBreadcrumb({
           alwaysShowTail: tailCount,
           allowTitleOnly: true,
           allowMultipleEllipses,
-          grouping,
+          grouping: resolvedGrouping,
         },
       });
     },
@@ -237,7 +282,7 @@ export function ResponsiveBreadcrumb({
       customLoadingFallback,
       fallbackAtWidth,
       forceCollapse,
-      grouping,
+      resolvedGrouping,
       hasCurrentMeasurements,
       headCount,
       includeNextArrow,
@@ -480,6 +525,7 @@ export function ResponsiveBreadcrumb({
       customEllipsisElement={customEllipsisElement}
       lastItemClickable={lastItemClickable}
       showCollapsedCount={showCollapsedCount}
+      collapsedCountPlacement={collapsedCountPlacement}
       strings={resolvedStrings}
       clickableLeftOfEllipsis={clickableLeftOfEllipsis}
       separatorNavSide={separatorNavSide}
@@ -514,34 +560,37 @@ export function ResponsiveBreadcrumb({
       ) : (
         breadcrumb
       )}
-      <MeasurementTree
-        ref={measureRef}
-        items={items}
-        renderSeparator={renderSeparator}
-        renderItem={renderItem}
-        renderEllipsis={renderEllipsis}
-        renderTitleOnly={renderTitleOnly}
-        renderMenuItem={renderMenuItem}
-        renderItemLink={renderItemLink}
-        renderMenuLink={renderMenuLink}
-        isMobile={isMobile}
-        showHomeIcon={showHomeIcon}
-        showNextArrow={showNextArrow}
-        nextItems={nextItems}
-        separatorNavItems={separatorNavItems}
-        separatorNavSide={separatorNavSide}
-        showCurrentInNav={showCurrentInNav}
-        titleOnlyFallback={resolvedTitleOnlyFallback}
-        titleOnlyIcon={titleOnlyIcon}
-        titleOnlyCustomElement={titleOnlyCustomElement}
-        customEllipsisElement={customEllipsisElement}
-        lastItemClickable={lastItemClickable}
-        showCollapsedCount={showCollapsedCount}
-        clickableLeftOfEllipsis={clickableLeftOfEllipsis}
-        strings={resolvedStrings}
-        focusRing={resolvedFocusRing}
-        isRtl={isRtl}
-      />
+      {needsMeasurements ? (
+        <MeasurementTree
+          ref={measureRef}
+          items={items}
+          renderSeparator={renderSeparator}
+          renderItem={renderItem}
+          renderEllipsis={renderEllipsis}
+          renderTitleOnly={renderTitleOnly}
+          renderMenuItem={renderMenuItem}
+          renderItemLink={renderItemLink}
+          renderMenuLink={renderMenuLink}
+          isMobile={isMobile}
+          showHomeIcon={showHomeIcon}
+          showNextArrow={showNextArrow}
+          nextItems={nextItems}
+          separatorNavItems={separatorNavItems}
+          separatorNavSide={separatorNavSide}
+          showCurrentInNav={showCurrentInNav}
+          titleOnlyFallback={resolvedTitleOnlyFallback}
+          titleOnlyIcon={titleOnlyIcon}
+          titleOnlyCustomElement={titleOnlyCustomElement}
+          customEllipsisElement={customEllipsisElement}
+          lastItemClickable={lastItemClickable}
+          showCollapsedCount={showCollapsedCount}
+          collapsedCountPlacement={collapsedCountPlacement}
+          clickableLeftOfEllipsis={clickableLeftOfEllipsis}
+          strings={resolvedStrings}
+          focusRing={resolvedFocusRing}
+          isRtl={isRtl}
+        />
+      ) : null}
     </div>
   );
 }
@@ -554,6 +603,7 @@ export type {
   CollapsePreference,
   CollapseStrategy,
   BreadcrumbFocusRing,
+  CollapsedCountPlacement,
   LayoutNode,
   ResponsiveBreadcrumbProps,
   SeparatorNavItem,
@@ -585,6 +635,7 @@ const MeasurementTree = React.forwardRef<
     customEllipsisElement?: React.ReactNode;
     lastItemClickable: boolean;
     showCollapsedCount: boolean;
+    collapsedCountPlacement: CollapsedCountPlacement;
     clickableLeftOfEllipsis: boolean;
     strings: ResponsiveBreadcrumbStrings;
     focusRing: BreadcrumbFocusRing;
@@ -613,6 +664,7 @@ const MeasurementTree = React.forwardRef<
     customEllipsisElement,
     lastItemClickable,
     showCollapsedCount,
+    collapsedCountPlacement,
     clickableLeftOfEllipsis,
     strings,
     focusRing,
@@ -658,6 +710,7 @@ const MeasurementTree = React.forwardRef<
     customEllipsisElement,
     lastItemClickable,
     showCollapsedCount,
+    collapsedCountPlacement,
     strings,
     clickableLeftOfEllipsis,
     separatorNavSide,
@@ -882,8 +935,14 @@ function getSeparatorOverlayId({
         ? nextNode.from
         : node.after + 1;
   const nextItem = items[nextIndex];
+  const previousNode = layout[nodeIndex - 1];
   const anchorItem = separatorNavSide === "left" ? previousItem : nextItem;
-  const leftOfEllipsis = nextNode?.type === "ellipsis";
+  // The anchor item is hidden when the separator sits against an ellipsis on
+  // its anchor side; clickableLeftOfEllipsis opts into that collapsed menu.
+  const anchorInEllipsis =
+    separatorNavSide === "left"
+      ? previousNode?.type === "ellipsis"
+      : nextNode?.type === "ellipsis";
   const baseNavItems = getSeparatorNavItems(
     separatorNavItems,
     previousItem,
@@ -897,7 +956,7 @@ function getSeparatorOverlayId({
   });
   const interactive =
     navItems.length > 0 &&
-    (!leftOfEllipsis || clickableLeftOfEllipsis);
+    (!anchorInEllipsis || clickableLeftOfEllipsis);
 
   if (!interactive) {
     return null;

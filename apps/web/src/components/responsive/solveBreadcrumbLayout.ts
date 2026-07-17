@@ -8,6 +8,12 @@ import type {
 type Range = { a: number; b: number };
 type Grouping = NonNullable<ResponsiveBreadcrumbProps["grouping"]>;
 
+/**
+ * Above this number of collapsible items the exhaustive 2^n enumeration of
+ * multi-ellipsis candidates (4096 at 12) is replaced by the greedy expansion.
+ */
+const MAX_EXHAUSTIVE_COLLAPSIBLE = 12;
+
 export interface SolveBreadcrumbLayoutInput {
   availableWidth: number;
   itemWidths: number[];
@@ -93,7 +99,12 @@ export function solveBreadcrumbLayout({
     collapsedRanges: [],
   });
   const fullLayoutWidth = getLayoutWidth(fullLayout, gapWidth);
-  const forcedIndices = getForcedIndices(options.forcedCollapsed);
+  // Pinned head/tail items win over forceCollapse: forced indices that ended
+  // up non-collapsible are dropped instead of making every candidate
+  // unsatisfiable (which used to force the title-only fallback).
+  const forcedIndices = getForcedIndices(options.forcedCollapsed).filter(
+    (index) => canCollapse[index],
+  );
   const allowMultipleEllipses =
     options.allowMultipleEllipses === true && options.grouping !== "contiguous";
   const grouping = options.grouping ?? "contiguous";
@@ -122,7 +133,7 @@ export function solveBreadcrumbLayout({
     : getSingleRangeCandidates({
         count,
         canCollapse,
-        forcedRange: getForcedRange(options.forcedCollapsed),
+        forcedRange: toRange(forcedIndices),
       });
 
   const fittingCandidates = candidates
@@ -301,16 +312,14 @@ function getForcedIndices(forcedCollapsed?: boolean[]) {
     .filter((index) => index >= 0);
 }
 
-function getForcedRange(forcedCollapsed?: boolean[]): Range | null {
-  const forcedIndices = getForcedIndices(forcedCollapsed);
-
-  if (forcedIndices.length === 0) {
+function toRange(indices: number[]): Range | null {
+  if (indices.length === 0) {
     return null;
   }
 
   return {
-    a: Math.min(...forcedIndices),
-    b: Math.max(...forcedIndices),
+    a: Math.min(...indices),
+    b: Math.max(...indices),
   };
 }
 
@@ -360,11 +369,7 @@ function getMultiRangeCandidates({
     .filter((index) => canCollapse[index]);
   const forcedSet = new Set(forcedIndices);
 
-  if (collapsibleIndices.some((index) => forcedSet.has(index) && !canCollapse[index])) {
-    return [];
-  }
-
-  if (collapsibleIndices.length > 16) {
+  if (collapsibleIndices.length > MAX_EXHAUSTIVE_COLLAPSIBLE) {
     return getGreedyMultiRangeCandidates({
       collapsibleIndices,
       forcedSet,

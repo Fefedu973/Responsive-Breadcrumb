@@ -50,6 +50,18 @@ assert.match(
 
 assert.match(
   renderer,
+  /collapsedCountPlacement === "outside"[\s\S]*className="pointer-events-none -ms-3 -mt-1 self-start"/,
+  "outside collapsed count is a sibling that clears the ellipsis dots",
+);
+
+assert.match(
+  renderer,
+  /showInlineCount \? "h-8 w-auto min-w-8 px-2" : "size-8 px-0"/,
+  "inline collapsed count grows the ellipsis button",
+);
+
+assert.match(
+  renderer,
   /data-measure-next=\{\s*isMeasure && measurementScope === "full" \? "" : undefined\s*\}/,
   "next-arrow measurement is scoped to the full measurement layout",
 );
@@ -89,6 +101,36 @@ assert.match(
   renderer,
   /renderMenuItem\?\.\(\{ item, mode: "menu", disabled \}\)/,
   "menu overlays use renderMenuItem when provided",
+);
+
+assert.match(
+  component,
+  /grouping \?\? \(allowMultipleEllipses \? "smart" : "contiguous"\)/,
+  "allowMultipleEllipses implies smart grouping unless grouping is explicit",
+);
+
+assert.match(
+  renderer,
+  /\) : current \? \(\s*<BreadcrumbPage/,
+  "BreadcrumbPage (aria-current) is reserved for the current item",
+);
+
+assert.doesNotMatch(
+  types,
+  /measureEllipsis|measureNextItems/,
+  "dead measurement strings are no longer part of the public API",
+);
+
+assert.match(
+  component,
+  /const needsMeasurements = overflowBehavior === "collapse"/,
+  "the hidden measurement tree is skipped outside collapse mode",
+);
+
+assert.match(
+  measurements,
+  /\}, \[measure, measureKey\]\);/,
+  "measurement is keyed instead of running on every render",
 );
 
 console.log("responsive breadcrumb source tests passed");

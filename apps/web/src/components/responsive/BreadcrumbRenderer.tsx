@@ -9,30 +9,31 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from "../ui/breadcrumb";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer";
+} from "../ui/drawer";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "../ui/popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+} from "../ui/tooltip";
+import { cn } from "../../lib/utils";
 import type {
   BreadcrumbData,
   BreadcrumbFocusRing,
+  CollapsedCountPlacement,
   LayoutNode,
   MeasurementMode,
   ResponsiveBreadcrumbProps,
@@ -68,6 +69,7 @@ export interface BreadcrumbRendererProps {
   customEllipsisElement?: React.ReactNode;
   lastItemClickable: boolean;
   showCollapsedCount: boolean;
+  collapsedCountPlacement: CollapsedCountPlacement;
   strings: ResponsiveBreadcrumbStrings;
   clickableLeftOfEllipsis: boolean;
   separatorNavSide: "right" | "left";
@@ -108,6 +110,7 @@ export function BreadcrumbRenderer({
   customEllipsisElement,
   lastItemClickable,
   showCollapsedCount,
+  collapsedCountPlacement,
   strings,
   clickableLeftOfEllipsis,
   separatorNavSide,
@@ -267,6 +270,7 @@ export function BreadcrumbRenderer({
                 renderMenuItem={renderMenuItem}
                 renderMenuLink={renderMenuLink}
                 showCollapsedCount={showCollapsedCount}
+                collapsedCountPlacement={collapsedCountPlacement}
                 strings={strings}
                 debug={debug}
                 focusRingClass={focusRingClass}
@@ -404,10 +408,20 @@ function RenderedItem({
     >
       {contentWithSchema}
     </button>
-  ) : (
+  ) : current ? (
     <BreadcrumbPage className={itemClassName} style={itemStyle}>
       {contentWithSchema}
     </BreadcrumbPage>
+  ) : (
+    // Non-current static items must not reuse BreadcrumbPage: its role="link"
+    // and aria-current="page" would announce several current pages.
+    <span
+      className={itemClassName}
+      style={itemStyle}
+      aria-disabled={item.disabled || undefined}
+    >
+      {contentWithSchema}
+    </span>
   );
   const renderedItem =
     truncatedWidth && showTooltipOnTruncate ? (
@@ -528,8 +542,14 @@ function RenderedSeparator({
         ? nextNode.from
         : node.after + 1;
   const nextItem = items[nextIndex];
+  const previousNode = layout[nodeIndex - 1];
   const anchorItem = separatorNavSide === "left" ? previousItem : nextItem;
-  const leftOfEllipsis = nextNode?.type === "ellipsis";
+  // The anchor item is hidden when the separator sits against an ellipsis on
+  // its anchor side; clickableLeftOfEllipsis opts into that collapsed menu.
+  const anchorInEllipsis =
+    separatorNavSide === "left"
+      ? previousNode?.type === "ellipsis"
+      : nextNode?.type === "ellipsis";
   const baseNavItems = getSeparatorNavItems(
     separatorNavItems,
     previousItem,
@@ -543,7 +563,7 @@ function RenderedSeparator({
   });
   const interactive =
     navItems.length > 0 &&
-    (!leftOfEllipsis || clickableLeftOfEllipsis);
+    (!anchorInEllipsis || clickableLeftOfEllipsis);
 
   if (!interactive) {
     return renderDecorativeSeparator({
@@ -622,6 +642,7 @@ function RenderedEllipsis({
   renderMenuItem,
   renderMenuLink,
   showCollapsedCount,
+  collapsedCountPlacement,
   strings,
   debug,
   focusRingClass,
@@ -640,6 +661,7 @@ function RenderedEllipsis({
   renderMenuItem?: ResponsiveBreadcrumbProps["renderMenuItem"];
   renderMenuLink?: ResponsiveBreadcrumbProps["renderMenuLink"];
   showCollapsedCount: boolean;
+  collapsedCountPlacement: CollapsedCountPlacement;
   strings: ResponsiveBreadcrumbStrings;
   debug: boolean;
   focusRingClass: string;
@@ -648,10 +670,16 @@ function RenderedEllipsis({
   const overlayId = `ellipsis-${node.from}-${node.to}`;
   const label = resolveLabel(strings.showCollapsedItems, hiddenItems.length);
   const title = resolveLabel(strings.moreOptions);
+  const renderedEllipsis = renderEllipsis?.({ hiddenItems, mode });
+  const usesDefaultEllipsis =
+    renderedEllipsis == null && customEllipsisElement == null;
+  const showDefaultCount = usesDefaultEllipsis && showCollapsedCount;
+  const showInlineCount =
+    showDefaultCount && collapsedCountPlacement === "inline";
   const content =
-    renderEllipsis?.({ hiddenItems, mode }) ??
+    renderedEllipsis ??
     customEllipsisElement ??
-    defaultEllipsisContent(hiddenItems.length, showCollapsedCount);
+    defaultEllipsisContent(hiddenItems.length, showInlineCount);
 
   return (
     <BreadcrumbItem
@@ -665,12 +693,23 @@ function RenderedEllipsis({
         isMobile={isMobile}
         open={openOverlay === overlayId}
         onOpenChange={(open) => onOpenOverlayChange(open ? overlayId : null)}
+        triggerAdornment={
+          showDefaultCount && collapsedCountPlacement === "outside" ? (
+            <CollapsedCountBadge
+              count={hiddenItems.length}
+              className="pointer-events-none -ms-3 -mt-1 self-start"
+            />
+          ) : null
+        }
         trigger={
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            className={cn("size-8 px-0", focusRingClass)}
+            className={cn(
+              showInlineCount ? "h-8 w-auto min-w-8 px-2" : "size-8 px-0",
+              focusRingClass,
+            )}
             aria-label={label}
             tabIndex={isMeasure ? -1 : undefined}
           >
@@ -777,6 +816,7 @@ function ResponsiveOverlay({
   open,
   onOpenChange,
   trigger,
+  triggerAdornment,
   children,
 }: {
   title: string;
@@ -784,12 +824,20 @@ function ResponsiveOverlay({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   trigger: React.ReactElement;
+  triggerAdornment?: React.ReactNode;
   children: React.ReactNode;
 }) {
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+        {triggerAdornment ? (
+          <span className="inline-flex shrink-0 items-start py-1">
+            <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+            {triggerAdornment}
+          </span>
+        ) : (
+          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+        )}
         <DrawerContent>
           <DrawerHeader>
             <DrawerTitle>{title}</DrawerTitle>
@@ -802,7 +850,14 @@ function ResponsiveOverlay({
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      {triggerAdornment ? (
+        <span className="inline-flex shrink-0 items-start py-1">
+          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+          {triggerAdornment}
+        </span>
+      ) : (
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      )}
       <PopoverContent align="start" className="w-auto min-w-40 max-w-64 p-1">
         {children}
       </PopoverContent>
@@ -921,12 +976,28 @@ function defaultEllipsisContent(count: number, showCollapsedCount: boolean) {
   return (
     <span className="inline-flex items-center gap-1">
       <MoreHorizontal className="size-4" aria-hidden />
-      {showCollapsedCount ? (
-        <Badge variant="secondary" className="h-4 px-1 text-[10px]">
-          {count}
-        </Badge>
-      ) : null}
+      {showCollapsedCount ? <CollapsedCountBadge count={count} /> : null}
     </span>
+  );
+}
+
+function CollapsedCountBadge({
+  count,
+  className,
+}: {
+  count: number;
+  className?: string;
+}) {
+  return (
+    <Badge
+      variant="secondary"
+      className={cn(
+        "h-4 min-w-4 px-1 text-[10px] leading-none tabular-nums",
+        className,
+      )}
+    >
+      {count}
+    </Badge>
   );
 }
 

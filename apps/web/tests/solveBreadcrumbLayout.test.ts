@@ -159,4 +159,24 @@ assert.deepEqual(
   "forceCollapse keeps non-contiguous forced items as separate ellipses when multi-ellipsis is enabled",
 );
 
+assert.equal(
+  solve({
+    availableWidth: 1_000,
+    forcedCollapsed: [false, false, false, true],
+  }).filter((node) => node.type === "item").length,
+  4,
+  "forceCollapse on a pinned tail item is ignored instead of forcing title-only",
+);
+
+assert.deepEqual(
+  getLayoutRange(
+    solve({
+      availableWidth: 1_000,
+      forcedCollapsed: [false, true, false, true],
+    }),
+  ),
+  { a: 1, b: 1 },
+  "forceCollapse collapses the remaining collapsible items when some are pinned",
+);
+
 console.log("solveBreadcrumbLayout tests passed");

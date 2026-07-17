@@ -8,6 +8,7 @@ export type CollapsePreference =
 
 export type MeasurementMode = "visible" | "measure" | "menu";
 export type BreadcrumbFocusRing = "inset" | "outer" | "clip-margin" | "none";
+export type CollapsedCountPlacement = "inline" | "outside";
 
 export interface BreadcrumbData {
   key: string;
@@ -95,8 +96,6 @@ export interface ResponsiveBreadcrumbStrings {
   noItemsAvailable: ResponsiveBreadcrumbLabel;
   itemLabelFallback: ResponsiveBreadcrumbLabel;
   truncatedItemTooltip: ResponsiveBreadcrumbLabel<[label: string]>;
-  measureEllipsis: ResponsiveBreadcrumbLabel;
-  measureNextItems: ResponsiveBreadcrumbLabel;
 }
 
 export interface ResponsiveBreadcrumbProps {
@@ -173,8 +172,12 @@ export interface ResponsiveBreadcrumbProps {
   truncateThreshold?: number;
   truncateOrder?: "biggest-first" | "smallest-first";
   showTooltipOnTruncate?: boolean;
-  /** Enables separated collapsed groups. Prefer false unless fixed middle items require it. */
+  /**
+   * Enables separated collapsed groups. Implies grouping "smart" unless a
+   * grouping is set explicitly (with "contiguous" the solver stays single-range).
+   */
   allowMultipleEllipses?: boolean;
+  /** Defaults to "contiguous", or "smart" when allowMultipleEllipses is true. */
   grouping?: "contiguous" | "free" | "smart";
   showCurrentInNav?: "never" | "with-others" | "always";
   loadingFallback?: "title" | "custom" | "none";
@@ -192,9 +195,14 @@ export interface ResponsiveBreadcrumbProps {
   lastItemClickable?: boolean;
   schema?: "json-ld" | "microdata" | "none";
   showCollapsedCount?: boolean;
+  /** Places the count inside the ellipsis button or floating beside it. */
+  collapsedCountPlacement?: CollapsedCountPlacement;
   /** Localized visible text and aria labels. */
   strings?: Partial<ResponsiveBreadcrumbStrings>;
-  /** Allows the separator directly before an ellipsis to open its navigation menu. */
+  /**
+   * Allows the separator adjacent to an ellipsis on its anchor side to open a
+   * navigation menu for the collapsed item it points to.
+   */
   clickableLeftOfEllipsis?: boolean;
   /** Binds interactive separator menus to the item on the right or left side. */
   separatorNavSide?: "right" | "left";
