@@ -17,8 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "responsive-breadcrumb",
-	description: "responsive-breadcrumb",
+	title: "Responsive Breadcrumb — The Breadcrumb That Always Fits",
+	description:
+		"A measured, accessible responsive breadcrumb for React and shadcn/ui that never overflows.",
 };
 
 export default function RootLayout({
