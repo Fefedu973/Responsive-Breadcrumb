@@ -5,6 +5,7 @@ export function DemoSection({
   index,
   title,
   description,
+  action,
   children,
   className,
 }: {
@@ -12,6 +13,7 @@ export function DemoSection({
   index: string;
   title: string;
   description: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -21,7 +23,12 @@ export function DemoSection({
         <p className="mb-2 font-mono text-xs tracking-widest text-muted-foreground uppercase">
           {index}
         </p>
-        <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">{title}</h2>
+        <div className="flex items-start justify-between gap-4">
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+            {title}
+          </h2>
+          {action ? <div className="shrink-0">{action}</div> : null}
+        </div>
         <p className="mt-3 text-muted-foreground">{description}</p>
       </div>
       {children}

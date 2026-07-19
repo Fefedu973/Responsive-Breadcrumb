@@ -125,7 +125,7 @@ const API_REFERENCE_MARKDOWN = createApiReferenceMarkdown(GROUPS, {
     "https://fefedu973.github.io/Responsive-Breadcrumb/#api",
 });
 
-export function ApiReference() {
+export function ApiReferenceMarkdownButton() {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -150,29 +150,31 @@ export function ApiReference() {
   const buttonLabel = copied ? "Markdown copied" : "Copy as Markdown";
 
   return (
-    <div>
-      <div className="mb-4 flex justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={copyMarkdown}
-          aria-label={buttonLabel}
-        >
-          {copied ? (
-            <Check
-              data-icon="inline-start"
-              className="text-emerald-500"
-              aria-hidden
-            />
-          ) : (
-            <Copy data-icon="inline-start" aria-hidden />
-          )}
-          <span aria-live="polite">{buttonLabel}</span>
-        </Button>
-      </div>
-      <div className="space-y-8">
-        {GROUPS.map((group) => (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={copyMarkdown}
+      aria-label={buttonLabel}
+    >
+      {copied ? (
+        <Check
+          data-icon="inline-start"
+          className="text-emerald-500"
+          aria-hidden
+        />
+      ) : (
+        <Copy data-icon="inline-start" aria-hidden />
+      )}
+      <span aria-live="polite">{buttonLabel}</span>
+    </Button>
+  );
+}
+
+export function ApiReference() {
+  return (
+    <div className="space-y-8">
+      {GROUPS.map((group) => (
           <div key={group.title}>
             <h3 className="mb-3 text-sm font-semibold tracking-tight">
               {group.title}
@@ -208,8 +210,7 @@ export function ApiReference() {
               </table>
             </div>
           </div>
-        ))}
-      </div>
+      ))}
     </div>
   );
 }

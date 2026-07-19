@@ -1,6 +1,9 @@
 import { ChevronRight, Github } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { ApiReference } from "@/components/demo/api-reference";
+import {
+  ApiReference,
+  ApiReferenceMarkdownButton,
+} from "@/components/demo/api-reference";
 import { CopyCommand } from "@/components/demo/copy-command";
 import { DemoSection } from "@/components/demo/demo-section";
 import { FeatureGrid } from "@/components/demo/feature-demos";
@@ -136,6 +139,7 @@ export default function Home() {
           index="04 — API"
           title="Props reference"
           description="The full public surface of ResponsiveBreadcrumb, grouped by concern."
+          action={<ApiReferenceMarkdownButton />}
         >
           <ApiReference />
         </DemoSection>
